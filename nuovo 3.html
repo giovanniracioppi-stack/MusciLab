@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Header Natalizio Musicale</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Playfair+Display:wght@500&display=swap');
+
+    body {
+      margin: 0;
+      background: linear-gradient(to bottom, #b30d0d, #3b0000);
+      font-family: 'Playfair Display', serif;
+      color: #fff;
+      overflow-x: hidden;
+    }
+
+    header {
+      position: relative;
+      text-align: center;
+      padding: 80px 20px;
+      background: radial-gradient(circle at top, #fff4e6 0%, #b30d0d 90%);
+      color: #3b0000;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+
+    header h1 {
+      font-family: 'Great Vibes', cursive;
+      font-size: 3.5rem;
+      margin: 0;
+      color: #a60000;
+      text-shadow: 2px 2px 8px rgba(255,255,255,0.5);
+    }
+
+    header p {
+      font-size: 1.3rem;
+      margin-top: 10px;
+      color: #663300;
+    }
+
+    /* Fiocchi di neve */
+    .snowflake {
+      position: fixed;
+      top: -10px;
+      color: white;
+      font-size: 1.2em;
+      opacity: 0.8;
+      animation: fall 10s linear infinite;
+    }
+
+    @keyframes fall {
+      0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+    }
+
+    /* Pulsante musica */
+    #music-control {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: #a60000;
+      border: none;
+      color: white;
+      padding: 10px 15px;
+      border-radius: 25px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+
+    #music-control:hover {
+      background: #d63333;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <button id="music-control">🎵 Musica</button>
+    <h1>Buon Natale!</h1>
+    <p>Che la magia delle feste illumini il tuo sito ✨</p>
+  </header>
+
+  <audio id="bg-music" loop>
+    <source src="https://cdn.pixabay.com/audio/2022/12/16/audio_bf40d6b1a0.mp3" type="audio/mpeg">
+    Il tuo browser non supporta l’audio.
+  </audio>
+
+  <script>
+    // Controllo musica
+    const button = document.getElementById('music-control');
+    const music = document.getElementById('bg-music');
+    let playing = false;
+
+    button.addEventListener('click', () => {
+      if (!playing) {
+        music.play();
+        button.textContent = "⏸️ Pausa";
+      } else {
+        music.pause();
+        button.textContent = "🎵 Musica";
+      }
+      playing = !playing;
+    });
+
+    // Fiocchi di neve dinamici
+    function createSnowflake() {
+      const snowflake = document.createElement('div');
+      snowflake.classList.add('snowflake');
+      snowflake.textContent = '❄';
+      snowflake.style.left = Math.random() * 100 + 'vw';
+      snowflake.style.animationDuration = (Math.random() * 5 + 5) + 's';
+      snowflake.style.fontSize = (Math.random() * 10 + 10) + 'px';
+      document.body.appendChild(snowflake);
+
+      setTimeout(() => snowflake.remove(), 10000);
+    }
+    setInterval(createSnowflake, 200);
+  </script>
+</body>
+</html>
