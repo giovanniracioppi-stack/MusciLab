@@ -216,7 +216,7 @@ body {
   max-width: 840px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto auto auto;
   gap: 10px;
 }
 
@@ -397,6 +397,12 @@ body {
 .speak:hover { filter: brightness(1.03); }
 .speak:active { filter: brightness(0.98); }
 .speak:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.speak-hint {
+  font-size: 12px;
+  color: var(--muted);
+  align-self: center;
+}
 
 .mic-icon { display: inline-block; }
 .speak-label { display: inline-block; }

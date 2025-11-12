@@ -26,7 +26,7 @@ const avatars = Array.from({ length: 10 }, (_, i) => {
     name: "DoReMilla Campanella",
     initial: "DC",
     video: `Avatar_${id}.mp4`,
-    question: questions[i],
+    question: questions[i], 
   };
 });
 
@@ -40,6 +40,10 @@ const chatForm = document.getElementById("chatForm");
 const userInput = document.getElementById("userInput");
 const sendBtn = document.getElementById("sendBtn");
 const speakBtn = document.getElementById("speakBtn");
+const speakHint = document.getElementById("speakHint");
+const speakIconPath = speakBtn ? speakBtn.querySelector(".mic-icon path") : null;
+const MIC_D = "M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 14 0h-2zm-5 8v-3h-2v3h2z";
+const STOP_D = "M6 6h12v12H6z";
 const avatarCircle = document.getElementById("avatarCircle");
 const avatarName = document.getElementById("avatarName");
 const avatarVideoContainer = document.getElementById("avatarVideoContainer");
@@ -50,10 +54,12 @@ let recognition = null;
 let isRecognizing = false;
 let forceEnableSend = false; // abilita Invia dopo stop esplicito
 let stoppedByUser = false; // traccia se lo stop è stato richiesto dall'utente
+let recognitionBuffer = "";
 const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SpeechRec) {
   recognition = new SpeechRec();
   recognition.lang = "it-IT";
+  recognition.continuous = false;
   recognition.interimResults = true;
   recognition.maxAlternatives = 1;
 
@@ -63,7 +69,11 @@ if (SpeechRec) {
       speakBtn.classList.add("recording");
       const labelEl = speakBtn.querySelector(".speak-label");
       if (labelEl) labelEl.textContent = "Stop";
+      if (speakIconPath) speakIconPath.setAttribute("d", STOP_D);
     }
+    if (speakHint) speakHint.style.display = "none";
+    if (speakBtn) speakBtn.style.display = "inline-flex";
+    recognitionBuffer = "";
     // Evita conflitti di input durante la dettatura
     userInput.disabled = true;
     sendBtn.disabled = true; // invia abilitato solo quando c'è testo
@@ -82,19 +92,39 @@ if (SpeechRec) {
         interimText = transcript;
       }
     }
-    userInput.value = (finalText + interimText).trim();
+    recognitionBuffer += finalText;
+    userInput.value = (recognitionBuffer + interimText).trim();
     updateSendDisabled();
   };
 
-  recognition.onerror = () => {
+  recognition.onerror = (event) => {
     if (speakBtn) {
       speakBtn.classList.remove("recording");
       const labelEl = speakBtn.querySelector(".speak-label");
       if (labelEl) labelEl.textContent = "Parla";
+      if (speakIconPath) speakIconPath.setAttribute("d", MIC_D);
     }
     isRecognizing = false;
     userInput.disabled = false;
     updateSendDisabled();
+    if (speakBtn) speakBtn.style.display = "inline-flex";
+    const err = event && event.error ? event.error : "unknown";
+    let msg = "Si è verificato un errore nella dettatura vocale.";
+    if (err === "not-allowed") msg = "Permesso microfono negato. Concedi l'accesso al microfono nel browser.";
+    else if (err === "no-speech") msg = "Non ho rilevato parlato. Prova a parlare più vicino al microfono.";
+    else if (err === "audio-capture") msg = "Nessun microfono rilevato. Controlla le impostazioni audio del sistema.";
+    else if (err === "network") msg = "Errore di rete del servizio di riconoscimento. Riprova tra poco.";
+    renderMessage(msg, "avatar", { id: 99, name: "Assistente", initial: "ML" });
+
+    if (speakHint) {
+      if (err === "not-allowed") {
+        speakHint.textContent = "Consenti il microfono nelle impostazioni del browser";
+        speakHint.style.display = "inline";
+      } else if (err === "audio-capture") {
+        speakHint.textContent = "Controlla che un microfono sia collegato/attivo";
+        speakHint.style.display = "inline";
+      }
+    }
   };
 
   recognition.onend = () => {
@@ -103,8 +133,11 @@ if (SpeechRec) {
       speakBtn.classList.remove("recording");
       const labelEl = speakBtn.querySelector(".speak-label");
       if (labelEl) labelEl.textContent = "Parla";
+      if (speakIconPath) speakIconPath.setAttribute("d", MIC_D);
     }
     userInput.disabled = false;
+    if (speakBtn) speakBtn.style.display = "inline-flex";
+    userInput.value = recognitionBuffer.trim();
     // Il testo dettato resta nell'input.
     // Se lo stop è stato richiesto dall'utente, abilitiamo subito Invia.
     if (stoppedByUser) {
@@ -117,6 +150,12 @@ if (SpeechRec) {
       updateSendDisabled();
     }
   };
+}
+if (!SpeechRec && speakBtn) {
+  speakBtn.disabled = true;
+  const labelEl = speakBtn.querySelector(".speak-label");
+  if (labelEl) labelEl.textContent = "Non supportato";
+  speakBtn.title = "La dettatura vocale non è supportata dal tuo browser. Usa Chrome o Edge.";
 }
 
 function getAvatarColor(idx) {
@@ -329,6 +368,11 @@ if (speakBtn) {
         // in alcuni browser, start può lanciare se già in esecuzione
         stoppedByUser = true;
         recognition.stop();
+        renderMessage("Se non parte, consenti il microfono e usa Chrome/Edge su localhost.", "avatar", { id: 97, name: "Assistente", initial: "ML" });
+        if (speakHint) {
+          speakHint.textContent = "Consenti il microfono nel browser";
+          speakHint.style.display = "inline";
+        }
       }
     }
   });
