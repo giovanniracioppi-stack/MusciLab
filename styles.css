@@ -10,6 +10,7 @@
   --chat-bg: #e9f1f7; /* sfondo chat più scuro */
   --text: #0b1f2a;
   --muted: #7b8b99;
+  --banner-h: 56px;
 }
 
 * { box-sizing: border-box; }
@@ -101,7 +102,16 @@ body {
   flex: 1;
   overflow-y: auto;
   padding: 12px; /* spazio chat leggermente ridotto */
-  background: var(--chat-bg);
+  background:
+    linear-gradient(180deg,
+      rgba(255,255,255,0.55) 0%,
+      rgba(255,255,255,0.78) 60%,
+      rgba(255,255,255,0.94) 100%
+    ),
+    url('sfondo.png');
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
 }
 
 .messages {
@@ -418,4 +428,31 @@ body {
 @keyframes pulse-mic {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.03); }
+}
+.top-banner {
+  position: relative;
+  background: #ffffffcc;
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  border-bottom: 1px solid rgba(0,104,178,0.18);
+}
+.banner-content {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 8px 16px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+.banner-logo {
+  height: 36px;
+  width: auto;
+  object-fit: contain;
+}
+.banner-title {
+  text-align: center;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--text);
 }
