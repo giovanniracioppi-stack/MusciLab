@@ -359,7 +359,7 @@ function finishFlow() {
     })
     .catch(() => {
       showTyping(false);
-      renderMessage("Errore nella generazione del testo. Configura le credenziali in secrets.json o localStorage.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      renderMessage("Errore nella generazione del testo. Backend non raggiungibile.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
     });
 }
 
@@ -367,33 +367,14 @@ let secretsPromise = null;
 async function loadSecrets() {
   if (secretsPromise) return secretsPromise;
   secretsPromise = (async () => {
-    try {
-      const res = await fetch("secrets.json", { cache: "no-store" });
-      if (res.ok) {
-        const obj = await res.json();
-        const apiKey = obj.apiKey || obj.OPENAI_API_KEY || localStorage.getItem("OPENAI_API_KEY");
-        const model = obj.model || localStorage.getItem("OPENAI_MODEL") || "gpt-4o-mini";
-        const assistantId = obj.assistantId || obj.OPENAI_ASSISTANT_ID || localStorage.getItem("OPENAI_ASSISTANT_ID");
-        const backendUrl = obj.backendUrl || obj.BACKEND_URL || localStorage.getItem("MUSICLAB_BACKEND_URL");
-        if (apiKey) localStorage.setItem("OPENAI_API_KEY", apiKey);
-        if (assistantId) localStorage.setItem("OPENAI_ASSISTANT_ID", assistantId);
-        if (model) localStorage.setItem("OPENAI_MODEL", model);
-        if (backendUrl) localStorage.setItem("MUSICLAB_BACKEND_URL", backendUrl);
-        return { apiKey, model, assistantId, backendUrl };
-      }
-    } catch (_) {}
-    return {
-      apiKey: localStorage.getItem("OPENAI_API_KEY"),
-      model: localStorage.getItem("OPENAI_MODEL") || "gpt-4o-mini",
-      assistantId: localStorage.getItem("OPENAI_ASSISTANT_ID"),
-      backendUrl: localStorage.getItem("MUSICLAB_BACKEND_URL"),
-    };
+    const backendUrl = localStorage.getItem("MUSICLAB_BACKEND_URL") || "https://hyperlabs.pythonanywhere.com/";
+    return { backendUrl };
   })();
   return secretsPromise;
 }
 
 async function callMusicLab(prompt) {
-  const { apiKey, model, assistantId, backendUrl } = await loadSecrets();
+  const { backendUrl } = await loadSecrets();
   if (backendUrl) {
     try {
       const u = backendUrl.endsWith("/") ? backendUrl + "generate" : backendUrl + "/generate";
@@ -419,77 +400,10 @@ async function callMusicLab(prompt) {
       return data.text || "";
     }
   } catch (_) {}
-  if (!apiKey) throw new Error("missing_key");
-  if (assistantId) {
-    return callMusicLabAssistant(prompt, apiKey, assistantId);
-  }
-  return callMusicLabChat(prompt, apiKey, model);
+  throw new Error("missing_backend");
 }
 
-async function callMusicLabChat(prompt, apiKey, model) {
-  const body = {
-    model,
-    messages: [
-      { role: "system", content: "Sei MusicLab, un paroliere e cantautore italiano per bambini. Rispondi solo con il testo completo della canzone." },
-      { role: "user", content: prompt },
-    ],
-    temperature: 0.7,
-  };
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + apiKey,
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error("http_" + res.status);
-  const data = await res.json();
-  const text = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
-  return text;
-}
-
-async function callMusicLabAssistant(prompt, apiKey, assistantId) {
-  const tRes = await fetch("https://api.openai.com/v1/threads", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + apiKey,
-      "OpenAI-Beta": "assistants=v2",
-    },
-    body: JSON.stringify({ messages: [{ role: "user", content: prompt }] }),
-  });
-  if (!tRes.ok) throw new Error("http_" + tRes.status);
-  const thread = await tRes.json();
-  const rRes = await fetch(`https://api.openai.com/v1/threads/${thread.id}/runs`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + apiKey,
-      "OpenAI-Beta": "assistants=v2",
-    },
-    body: JSON.stringify({ assistant_id: assistantId }),
-  });
-  if (!rRes.ok) throw new Error("http_" + rRes.status);
-  let run = await rRes.json();
-  while (run.status === "queued" || run.status === "in_progress" || run.status === "requires_action") {
-    await new Promise((r) => setTimeout(r, 1000));
-    const sRes = await fetch(`https://api.openai.com/v1/threads/${thread.id}/runs/${run.id}`, {
-      headers: { Authorization: "Bearer " + apiKey, "OpenAI-Beta": "assistants=v2" },
-    });
-    if (!sRes.ok) throw new Error("http_" + sRes.status);
-    run = await sRes.json();
-  }
-  if (run.status !== "completed") throw new Error("run_failed");
-  const mRes = await fetch(`https://api.openai.com/v1/threads/${thread.id}/messages`, {
-    headers: { Authorization: "Bearer " + apiKey, "OpenAI-Beta": "assistants=v2" },
-  });
-  if (!mRes.ok) throw new Error("http_" + mRes.status);
-  const mData = await mRes.json();
-  const msg = (mData && mData.data || []).find((x) => x.role === "assistant");
-  const text = msg && msg.content && msg.content[0] && msg.content[0].text && msg.content[0].text.value ? msg.content[0].text.value : "";
-  return text;
-}
+ 
 
 function handleUserAnswer(text) {
   if (!waitingForUser) return;
