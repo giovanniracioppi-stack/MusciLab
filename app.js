@@ -23,8 +23,8 @@ const avatars = Array.from({ length: 10 }, (_, i) => {
   ];
   return {
     id,
-    name: "DoReMilla Campanella",
-    initial: "DC",
+    name: "DoReMilla",
+    initial: "DM",
     video: `Avatar_${id}.mp4`,
     question: questions[i], 
   };
@@ -33,6 +33,18 @@ const avatars = Array.from({ length: 10 }, (_, i) => {
 let currentIndex = 0;
 let waitingForUser = false;
 const answers = [];
+const categories = [
+  "Storia delle canzone",
+  "Emozione della canzone",
+  "Stile musicale",
+  "Ritmo della canzone",
+  "Struttura della canzone",
+  "Protagonista della canzone",
+  "Testo",
+  "Strumenti musicale",
+  "Ispirazione",
+  "Messaggio della canzone",
+];
 
 // Riferimenti DOM
 const messagesEl = document.getElementById("messages");
@@ -295,10 +307,188 @@ function showNextQuestion() {
 function finishFlow() {
   userInput.disabled = true;
   sendBtn.disabled = true;
-  const outro = [
-    
-    "Wow… che meraviglia! 🎶\nHai appena creato la base perfetta per una canzone di Natale che parlerà di te e del tuo modo di vivere la magia delle feste! ✨\nOra… chiudi gli occhi, ascolta la musica del Natale… e lascia che la tua immaginazione canti! 🎄🎶"];
-  playAssistantLines(outro);
+  const getAns = (n) => {
+    const item = answers.find(a => a.numero === n);
+    return item ? item.risposta : "";
+  };
+  const cats = [
+    "Storia della canzone",
+    "Emozione principale",
+    "Stile musicale",
+    "Ritmo della canzone",
+    "Struttura della canzone",
+    "Protagonista della canzone",
+    "Parole da inserire nel esto della canzone",
+    "Strumenti musicali predominanti",
+    "Ispirazione",
+    "Messaggio della canzone",
+  ];
+  const getQ = (n) => {
+    const av = avatars[n - 1];
+    return av ? av.question : "";
+  };
+  const lines = [
+    "Sei un paroliere e cantautore italiano specializzato in canzoni per bambini.",
+    " Il tuo compito è generare testi originali, semplici, allegri e adatti all’infanzia, seguendo le indicazioni fornite dall’utente.",
+    " ",
+    " ISTRUZIONI:",
+    " ",
+    " 1. Riceverai le seguenti informazioni dall’utente:",
+    ...cats.map((c, i) => `    - Categoria: ${c} - domanda: ${getQ(i + 1)} - risposta: ${getAns(i + 1)}`),
+    " ",
+    " 2. CREA IL TESTO DELLA CANZONE:",
+    "    - Linguaggio semplice e comprensibile per bambini.",
+    "    - Tono positivo, gioioso, leggero e divertente.",
+    "    - Inserisci immagini colorate, elementi magici o simpatici.",
+    "    - Mantieni coerenza narrativa e ritmo cantabile.",
+    "    - Evita contenuti violenti, complessi o non adatti all’infanzia.",
+    "    - Rispetta la struttura richiesta.",
+    "    - Evita rime forzate e cliché, prediligi metafore e immagini semplici.",
+    " ",
+    " 3. CONSEGNA:",
+    "    - Restituisci **solo il testo completo della canzone**, senza spiegazioni aggiuntive.",
+  ];
+  const prompt = lines.join("\n");
+  renderMessage("Sto scrivendo la tua canzone, dammi un attimo per pensare", "avatar", { id: 99, name: "MusicLab", initial: "ML" });
+  showTyping(true);
+  callMusicLab(prompt)
+    .then((text) => {
+      showTyping(false);
+      const out = text && text.trim().length > 0 ? text.trim() : "Generazione vuota.";
+      renderMessage(out, "avatar", { id: 99, name: "MusicLab", initial: "ML" });
+    })
+    .catch(() => {
+      showTyping(false);
+      renderMessage("Errore nella generazione del testo. Configura le credenziali in secrets.json o localStorage.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+    });
+}
+
+let secretsPromise = null;
+async function loadSecrets() {
+  if (secretsPromise) return secretsPromise;
+  secretsPromise = (async () => {
+    try {
+      const res = await fetch("secrets.json", { cache: "no-store" });
+      if (res.ok) {
+        const obj = await res.json();
+        const apiKey = obj.apiKey || obj.OPENAI_API_KEY || localStorage.getItem("OPENAI_API_KEY");
+        const model = obj.model || localStorage.getItem("OPENAI_MODEL") || "gpt-4o-mini";
+        const assistantId = obj.assistantId || obj.OPENAI_ASSISTANT_ID || localStorage.getItem("OPENAI_ASSISTANT_ID");
+        const backendUrl = obj.backendUrl || obj.BACKEND_URL || localStorage.getItem("MUSICLAB_BACKEND_URL");
+        if (apiKey) localStorage.setItem("OPENAI_API_KEY", apiKey);
+        if (assistantId) localStorage.setItem("OPENAI_ASSISTANT_ID", assistantId);
+        if (model) localStorage.setItem("OPENAI_MODEL", model);
+        if (backendUrl) localStorage.setItem("MUSICLAB_BACKEND_URL", backendUrl);
+        return { apiKey, model, assistantId, backendUrl };
+      }
+    } catch (_) {}
+    return {
+      apiKey: localStorage.getItem("OPENAI_API_KEY"),
+      model: localStorage.getItem("OPENAI_MODEL") || "gpt-4o-mini",
+      assistantId: localStorage.getItem("OPENAI_ASSISTANT_ID"),
+      backendUrl: localStorage.getItem("MUSICLAB_BACKEND_URL"),
+    };
+  })();
+  return secretsPromise;
+}
+
+async function callMusicLab(prompt) {
+  const { apiKey, model, assistantId, backendUrl } = await loadSecrets();
+  if (backendUrl) {
+    try {
+      const u = backendUrl.endsWith("/") ? backendUrl + "generate" : backendUrl + "/generate";
+      const r = await fetch(u, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        return d.text || "";
+      }
+    } catch (_) {}
+  }
+  try {
+    const res = await fetch("/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.text || "";
+    }
+  } catch (_) {}
+  if (!apiKey) throw new Error("missing_key");
+  if (assistantId) {
+    return callMusicLabAssistant(prompt, apiKey, assistantId);
+  }
+  return callMusicLabChat(prompt, apiKey, model);
+}
+
+async function callMusicLabChat(prompt, apiKey, model) {
+  const body = {
+    model,
+    messages: [
+      { role: "system", content: "Sei MusicLab, un paroliere e cantautore italiano per bambini. Rispondi solo con il testo completo della canzone." },
+      { role: "user", content: prompt },
+    ],
+    temperature: 0.7,
+  };
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + apiKey,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("http_" + res.status);
+  const data = await res.json();
+  const text = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
+  return text;
+}
+
+async function callMusicLabAssistant(prompt, apiKey, assistantId) {
+  const tRes = await fetch("https://api.openai.com/v1/threads", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + apiKey,
+      "OpenAI-Beta": "assistants=v2",
+    },
+    body: JSON.stringify({ messages: [{ role: "user", content: prompt }] }),
+  });
+  if (!tRes.ok) throw new Error("http_" + tRes.status);
+  const thread = await tRes.json();
+  const rRes = await fetch(`https://api.openai.com/v1/threads/${thread.id}/runs`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + apiKey,
+      "OpenAI-Beta": "assistants=v2",
+    },
+    body: JSON.stringify({ assistant_id: assistantId }),
+  });
+  if (!rRes.ok) throw new Error("http_" + rRes.status);
+  let run = await rRes.json();
+  while (run.status === "queued" || run.status === "in_progress" || run.status === "requires_action") {
+    await new Promise((r) => setTimeout(r, 1000));
+    const sRes = await fetch(`https://api.openai.com/v1/threads/${thread.id}/runs/${run.id}`, {
+      headers: { Authorization: "Bearer " + apiKey, "OpenAI-Beta": "assistants=v2" },
+    });
+    if (!sRes.ok) throw new Error("http_" + sRes.status);
+    run = await sRes.json();
+  }
+  if (run.status !== "completed") throw new Error("run_failed");
+  const mRes = await fetch(`https://api.openai.com/v1/threads/${thread.id}/messages`, {
+    headers: { Authorization: "Bearer " + apiKey, "OpenAI-Beta": "assistants=v2" },
+  });
+  if (!mRes.ok) throw new Error("http_" + mRes.status);
+  const mData = await mRes.json();
+  const msg = (mData && mData.data || []).find((x) => x.role === "assistant");
+  const text = msg && msg.content && msg.content[0] && msg.content[0].text && msg.content[0].text.value ? msg.content[0].text.value : "";
+  return text;
 }
 
 function handleUserAnswer(text) {
@@ -306,7 +496,7 @@ function handleUserAnswer(text) {
   const answerText = (text ?? "").trim();
   if (!answerText) return;
   renderMessage(answerText, "user");
-  answers.push({ avatarId: avatars[currentIndex].id, answer: answerText });
+  answers.push({ numero: currentIndex + 1, categoria: categories[currentIndex], risposta: answerText });
   waitingForUser = false;
   userInput.value = "";
 
