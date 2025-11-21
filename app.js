@@ -232,7 +232,7 @@ function updateHeaderAvatar(av) {
     avatarVideo.src = av.video;
     avatarVideo.currentTime = 0;
     avatarVideo.loop = false;
-    avatarVideo.muted = true;
+    avatarVideo.muted = !avatarAudioEnabled;
 
     const showVideo = () => {
       avatarVideoContainer.style.display = "block";
@@ -247,14 +247,11 @@ function updateHeaderAvatar(av) {
 
     avatarVideo.oncanplay = () => {
       showVideo();
-      avatarVideo.play().catch(() => {
-        // in caso di blocco autoplay, restiamo muted e riproviamo
-        avatarVideo.muted = true;
-        avatarVideo.play().catch(() => {
-          // se ancora fallisce, fallback al cerchio
-          showCircle();
-        });
-      });
+      avatarVideo.play().catch(() => {});
+    };
+    avatarVideo.onended = () => {
+      if (avatarImageContainer) avatarImageContainer.style.display = "block";
+      avatarVideoContainer.style.display = "none";
     };
 
     avatarVideo.onerror = () => {
@@ -634,7 +631,7 @@ function handleUserAnswer(text) {
       waitingForUser = false;
       userInput.value = "";
       autoResize();
-      playAssistantLines(introLines, showNextQuestion);
+      playAssistantLines(introLines, showFirstQuestionAfterIntro);
       return;
     }
   }
@@ -773,3 +770,19 @@ window.addEventListener("DOMContentLoaded", () => {
     userInput.focus();
   }, 600);
 });
+function showFirstQuestionAfterIntro() {
+  if (avatarVideo && avatarVideoAllowed) {
+    const ready = avatarVideo.duration && avatarVideo.currentTime >= avatarVideo.duration;
+    if (avatarVideo.ended || ready) {
+      showNextQuestion();
+      return;
+    }
+    const handler = () => {
+      avatarVideo.removeEventListener("ended", handler);
+      showNextQuestion();
+    };
+    avatarVideo.addEventListener("ended", handler);
+    return;
+  }
+  showNextQuestion();
+}
