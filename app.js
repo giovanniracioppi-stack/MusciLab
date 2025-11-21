@@ -48,6 +48,7 @@ const categories = [
 
 // Riferimenti DOM
 const messagesEl = document.getElementById("messages");
+const chatEl = document.querySelector(".chat");
 const chatForm = document.getElementById("chatForm");
 const userInput = document.getElementById("userInput");
 const sendBtn = document.getElementById("sendBtn");
@@ -61,12 +62,23 @@ const avatarName = document.getElementById("avatarName");
 const avatarVideoContainer = document.getElementById("avatarVideoContainer");
 const avatarVideo = document.getElementById("avatarVideo");
 const typingEl = document.getElementById("typing");
+const emailGate = document.getElementById("emailGate");
+const emailInput = document.getElementById("emailInput");
+const emailCodeInput = document.getElementById("emailCodeInput");
+const emailConfirmBtn = document.getElementById("emailConfirmBtn");
+const emailError = document.getElementById("emailError");
 // Speech Recognition setup
 let recognition = null;
 let isRecognizing = false;
 let forceEnableSend = false; // abilita Invia dopo stop esplicito
 let stoppedByUser = false; // traccia se lo stop è stato richiesto dall'utente
 let recognitionBuffer = "";
+let userEmail = "";
+let userAccessCode = "";
+let gatePhase = null;
+const introLines = [
+  "Ehi tu! 🎁\nSì, proprio tu che ami il Natale! ✨\nHai mai pensato… di creare la tua canzone di Natale?\nUna canzone tutta tua, piena di emozioni, suoni e magia? 🎶\nBene! Oggi diventi tu il compositore del Natale! 😍\nIo ti farò dieci domande super speciali… e con le tue risposte, creeremo insieme la canzone più magica dell’anno!\nPronto? 3… 2… 1… via! 🌟"
+];
 const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SpeechRec) {
   recognition = new SpeechRec();
@@ -150,6 +162,7 @@ if (SpeechRec) {
     userInput.disabled = false;
     if (speakBtn) speakBtn.style.display = "inline-flex";
     userInput.value = recognitionBuffer.trim();
+    autoResize();
     // Il testo dettato resta nell'input.
     // Se lo stop è stato richiesto dall'utente, abilitiamo subito Invia.
     if (stoppedByUser) {
@@ -233,11 +246,50 @@ function updateHeaderAvatar(av) {
 
 function showTyping(show = true) {
   typingEl.style.display = show ? "block" : "none";
+  if (show) {
+    setTimeout(scrollToBottom, 0);
+  } else {
+    setTimeout(scrollToBottom, 0);
+  }
 }
 
 
 function scrollToBottom() {
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  if (chatEl) chatEl.scrollTop = chatEl.scrollHeight;
+  const last = messagesEl.lastElementChild;
+  if (last && typeof last.scrollIntoView === "function") last.scrollIntoView({ block: "end" });
+}
+
+function startCountdown(seconds) {
+  let s = Math.max(1, seconds | 0);
+  const bubble = document.createElement("div");
+  bubble.className = "message avatar";
+  const textEl = document.createElement("div");
+  textEl.textContent = `Ricarico tra ${s}s`;
+  const meta = document.createElement("div");
+  meta.className = "bubble-meta";
+  const tiny = document.createElement("div");
+  tiny.className = "tiny-avatar";
+  tiny.style.background = getAvatarColor(99);
+  tiny.textContent = "ML";
+  const who = document.createElement("span");
+  who.textContent = "Assistente";
+  meta.appendChild(tiny);
+  meta.appendChild(who);
+  bubble.appendChild(textEl);
+  bubble.appendChild(meta);
+  messagesEl.appendChild(bubble);
+  scrollToBottom();
+  const iv = setInterval(() => {
+    s -= 1;
+    if (s <= 0) {
+      clearInterval(iv);
+      location.reload();
+      return;
+    }
+    textEl.textContent = `Ricarico tra ${s}s`;
+    scrollToBottom();
+  }, 1000);
 }
 
 function renderMessage(text, sender = "avatar", av = null) {
@@ -307,6 +359,10 @@ function showNextQuestion() {
 function finishFlow() {
   userInput.disabled = true;
   sendBtn.disabled = true;
+  userInput.style.display = "none";
+  sendBtn.style.display = "none";
+  if (speakBtn) speakBtn.style.display = "none";
+  if (speakHint) speakHint.style.display = "none";
   const getAns = (n) => {
     const item = answers.find(a => a.numero === n);
     return item ? item.risposta : "";
@@ -356,10 +412,29 @@ function finishFlow() {
       showTyping(false);
       const out = text && text.trim().length > 0 ? text.trim() : "Generazione vuota.";
       renderMessage(out, "avatar", { id: 99, name: "MusicLab", initial: "ML" });
+  renderMessage("A breve riceverai una mail con il link per il download della TUA CANZONE", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+  notifyEmailWithSong(
+    "MusicLab — Link per il download",
+    out
+  );
+  startCountdown(30);
     })
-    .catch(() => {
+    .catch((e) => {
       showTyping(false);
-      renderMessage("Errore nella generazione del testo. Backend non raggiungibile.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      const msg = String(e && e.message || "");
+      let human = "Errore nella generazione del testo. Backend non raggiungibile.";
+      if (msg.startsWith("backend_")) {
+        const parts = msg.split("_", 3);
+        const code = parts[1] || "";
+        const body = parts[2] ? decodeURIComponent(parts[2]).slice(0, 500) : "";
+        human = `Errore backend (${code}). ${body}`;
+      } else if (msg.startsWith("local_")) {
+        const parts = msg.split("_", 3);
+        const code = parts[1] || "";
+        const body = parts[2] ? decodeURIComponent(parts[2]).slice(0, 500) : "";
+        human = `Errore server locale (${code}). ${body}`;
+      }
+      renderMessage(human, "avatar", { id: 99, name: "Assistente", initial: "ML" });
     });
 }
 
@@ -368,6 +443,7 @@ async function loadSecrets() {
   if (secretsPromise) return secretsPromise;
   secretsPromise = (async () => {
     const backendUrl = localStorage.getItem("MUSICLAB_BACKEND_URL") || "https://hyperlabs.pythonanywhere.com/";
+    //const backendUrl = localStorage.getItem("MUSICLAB_BACKEND_URL") || "http://localhost:8888/";
     return { backendUrl };
   })();
   return secretsPromise;
@@ -387,6 +463,8 @@ async function callMusicLab(prompt) {
         const d = await r.json();
         return d.text || "";
       }
+      const errBody = await r.text();
+      throw new Error("backend_" + r.status + "_" + encodeURIComponent(errBody || ""));
     } catch (_) {}
   }
   try {
@@ -399,8 +477,98 @@ async function callMusicLab(prompt) {
       const data = await res.json();
       return data.text || "";
     }
+    const errBody = await res.text();
+    throw new Error("local_" + res.status + "_" + encodeURIComponent(errBody || ""));
   } catch (_) {}
   throw new Error("missing_backend");
+}
+
+async function notifyEmailWithSong(subject, songText) {
+  const { backendUrl } = await loadSecrets();
+  if (!backendUrl || !userEmail) return;
+  const bodyText = "Grazie per aver dato voce al Natale con \u201cCurno AI Christmas Sound\u201d!\n Hai appena creato la tua canzone unica… ora è il momento di farla risuonare!\n Scaricala qui e, se ti va, condividila con noi: ci piacerebbe sentirla!\n Tagga il Centro Commerciale Curno e usa gli hashtag: \n di seguito il testo della tua canzone " + songText + "\n #MyXmasSound #CurnoVibes #NataleInNote \n ";
+  const bodyHtml = "<div>Grazie per aver dato voce al Natale con \u201cCurno AI Christmas Sound\u201d!</div>" +
+                   "<div>Hai appena creato la tua canzone unica… ora è il momento di farla risuonare!</div>" +
+                   "<div>Scaricala qui e, se ti va, condividila con noi: ci piacerebbe sentirla!</div>" +
+                   "<div>Tagga il Centro Commerciale Curno e usa gli hashtag:</div>" +
+                   "<div>di seguito il testo della tua canzone</div>" +
+                   "<pre style=\"white-space:pre-wrap;\">" + songText.replace(/</g, "&lt;") + "</pre>" +
+                   "<div>#MyXmasSound #CurnoVibes #NataleInNote</div>";
+  const recipients = [userEmail, "eventi.centrocommercialecurno@hyperlabs.it"].filter(Boolean);
+  const remote = backendUrl.endsWith("/") ? backendUrl + "send-email" : backendUrl + "/send-email";
+  let done = false;
+  try {
+    const res = await fetch(remote, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to: recipients, subject, text: bodyText, html: bodyHtml }),
+    });
+    if (res.ok) {
+      renderMessage("Email inviata! Controlla la tua casella.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      done = true;
+    } else {
+      let detail = "";
+      let code = "";
+      try {
+        const j = await res.json();
+        code = j && j.error ? String(j.error) : "";
+        detail = j && (j.detail || j.error || "");
+      } catch (_) {
+        try { detail = await res.text(); } catch (_) {}
+      }
+      const human = emailErrorMessage(code, detail, res.status);
+      renderMessage(human, "avatar", { id: 99, name: "Assistente", initial: "ML" });
+    }
+  } catch (e) {
+    const local = "http://localhost:8888/send-email";
+    try {
+      const res2 = await fetch(local, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: recipients, subject, text: bodyText, html: bodyHtml }),
+      });
+      if (res2.ok) {
+        renderMessage("Email inviata! Controlla la tua casella.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+        done = true;
+      } else {
+        let detail = "";
+        let code = "";
+        try {
+          const j = await res2.json();
+          code = j && j.error ? String(j.error) : "";
+          detail = j && (j.detail || j.error || "");
+        } catch (_) {
+          try { detail = await res2.text(); } catch (_) {}
+        }
+        const human = emailErrorMessage(code, detail, res2.status);
+        renderMessage(human, "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      }
+    } catch (e2) {
+      renderMessage("Invio email non riuscito: problema di rete o backend non raggiungibile.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+    }
+  }
+  userEmail = "";
+  userAccessCode = "";
+}
+
+function emailErrorMessage(code, detail, status) {
+  const map = {
+    smtp_missing_config: "SMTP non configurato: completa il file secrets.json",
+    smtp_not_configured: "SMTP non configurato",
+    smtp_auth_failed: "Autenticazione SMTP fallita: verifica utente e password",
+    smtp_connect_error: "Connessione SMTP non riuscita: verifica host e porta",
+    smtp_dns_error: "Errore DNS: impossibile risolvere l'host SMTP",
+    smtp_timeout: "Timeout connessione: il server SMTP non risponde",
+    smtp_recipients_refused: "Destinatari rifiutati dal server SMTP",
+    smtp_sender_refused: "Mittente rifiutato dal server SMTP",
+    smtp_data_error: "Errore dati durante l'invio SMTP",
+    smtp_helo_error: "Errore HELO/EHLO verso SMTP",
+    smtp_error: "Errore SMTP generico",
+    unknown_error: "Errore sconosciuto nel backend"
+  };
+  const base = map[code] || `Invio email non riuscito (${status})`;
+  const extra = detail ? `: ${typeof detail === "string" ? detail : JSON.stringify(detail)}` : "";
+  return base + extra;
 }
 
  
@@ -409,10 +577,46 @@ function handleUserAnswer(text) {
   if (!waitingForUser) return;
   const answerText = (text ?? "").trim();
   if (!answerText) return;
+  if (gatePhase) {
+    const who = { id: 99, name: "Assistente", initial: "ML" };
+    if (gatePhase === "email") {
+      const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!re.test(answerText)) {
+        renderMessage("Email non valida. Riprova.", "avatar", who);
+        waitingForUser = true;
+        updateSendDisabled();
+        return;
+      }
+      userEmail = answerText;
+      renderMessage("Perfetto! Ora inserisci il codice di accesso", "avatar", who);
+      gatePhase = "code";
+      waitingForUser = true;
+      userInput.value = "";
+      updateSendDisabled();
+      autoResize();
+      return;
+    }
+    if (gatePhase === "code") {
+      if (answerText.length < 4) {
+        renderMessage("Codice non valido. Deve avere almeno 4 caratteri.", "avatar", who);
+        waitingForUser = true;
+        updateSendDisabled();
+        return;
+      }
+      userAccessCode = answerText;
+      gatePhase = null;
+      waitingForUser = false;
+      userInput.value = "";
+      autoResize();
+      playAssistantLines(introLines, showNextQuestion);
+      return;
+    }
+  }
   renderMessage(answerText, "user");
   answers.push({ numero: currentIndex + 1, categoria: categories[currentIndex], risposta: answerText });
   waitingForUser = false;
   userInput.value = "";
+  autoResize();
 
   currentIndex += 1;
   if (currentIndex < avatars.length) {
@@ -430,7 +634,8 @@ function handleSubmit(e) {
 chatForm.addEventListener("submit", handleSubmit);
 userInput.addEventListener("keydown", (ev) => {
   if (ev.key === "Enter" && !ev.shiftKey) {
-    // Enter invia, Shift+Enter potrebbe essere usato per multi-line (non richiesto qui)
+    ev.preventDefault();
+    handleUserAnswer(userInput.value);
   }
 });
 
@@ -449,6 +654,13 @@ function updateSendDisabled() {
   sendBtn.disabled = !hasText;
 }
 userInput.addEventListener("input", updateSendDisabled);
+
+function autoResize() {
+  userInput.style.height = "auto";
+  const h = Math.min(userInput.scrollHeight, 220);
+  userInput.style.height = h + "px";
+}
+userInput.addEventListener("input", autoResize);
 
 if (speakBtn) {
   speakBtn.addEventListener("click", () => {
@@ -484,8 +696,17 @@ if (speakBtn) {
 
 // Avvio
 window.addEventListener("DOMContentLoaded", () => {
-  const intro = [
-    "Ehi tu! 🎁\nSì, proprio tu che ami il Natale! ✨\nHai mai pensato… di creare la tua canzone di Natale?\nUna canzone tutta tua, piena di emozioni, suoni e magia? 🎶\nBene! Oggi diventi tu il compositore del Natale! 😍\nIo ti farò dieci domande super speciali… e con le tue risposte, creeremo insieme la canzone più magica dell’anno!\nPronto? 3… 2… 1… via! 🌟" ];
   updateHeaderAvatar(avatars[0]);
-  playAssistantLines(intro, showNextQuestion);
+  showTyping(true);
+  setTimeout(() => {
+    showTyping(false);
+    renderMessage("Per iniziare, inserisci il tuo indirizzo email", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+    waitingForUser = true;
+    gatePhase = "email";
+    userInput.disabled = false;
+    forceEnableSend = false;
+    updateSendDisabled();
+    autoResize();
+    userInput.focus();
+  }, 600);
 });
