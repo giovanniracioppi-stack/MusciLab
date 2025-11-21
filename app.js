@@ -370,12 +370,12 @@ function showNextQuestion() {
   setTimeout(() => {
     showTyping(false);
     renderMessage(av.question, "avatar", av);
-    waitingForUser = true;
-    userInput.disabled = false;
-    // nuova domanda: rimuove forzatura di Invia
+    waitingForUser = false;
+    userInput.disabled = true;
+    if (speakBtn) speakBtn.disabled = true;
     forceEnableSend = false;
     updateSendDisabled();
-    userInput.focus();
+    gateAnswerUntilVideoEnds();
   }, 600);
 }
 
@@ -712,6 +712,30 @@ function enableAudioFromStart() {
   } catch (_) {}
 }
 
+function gateAnswerUntilVideoEnds() {
+  const enable = () => {
+    waitingForUser = true;
+    userInput.disabled = false;
+    if (speakBtn) speakBtn.disabled = false;
+    forceEnableSend = false;
+    updateSendDisabled();
+    userInput.focus();
+  };
+  if (avatarVideo && avatarVideoAllowed) {
+    if (avatarVideo.ended || (avatarVideo.duration && avatarVideo.currentTime >= avatarVideo.duration)) {
+      enable();
+      return;
+    }
+    const handler = () => {
+      avatarVideo.removeEventListener("ended", handler);
+      enable();
+    };
+    avatarVideo.addEventListener("ended", handler);
+    return;
+  }
+  enable();
+}
+
 if (avatarVideoContainer) {
   avatarVideoContainer.addEventListener("click", () => {
     avatarAudioEnabled = !avatarAudioEnabled;
@@ -724,6 +748,7 @@ if (avatarVideoContainer) {
 
 if (speakBtn) {
   speakBtn.addEventListener("click", () => {
+    if (!waitingForUser) return;
     if (!recognition) {
       // Fallback: informo che non è supportato
       renderMessage(
