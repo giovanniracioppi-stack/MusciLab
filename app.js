@@ -219,47 +219,52 @@ function updateHeaderAvatar(av) {
 
   // Prova a caricare e riprodurre il video
   if (avatarVideo) {
+    // Precarica sempre il video per evitare blocchi all'avvio
+    avatarVideo.src = av.video;
+    avatarVideo.preload = "auto";
     if (!avatarVideoAllowed) {
-      if (avatarImageContainer) avatarImageContainer.style.display = "block";
-      if (avatarVideoContainer) avatarVideoContainer.style.display = "none";
+      if (avatarImageContainer) avatarImageContainer.classList.remove("is-hidden");
+      if (avatarVideoContainer) avatarVideoContainer.classList.add("is-hidden");
       avatarCircle.style.display = "none";
       if (avatarImage) avatarImage.src = "avatar.png";
-      return;
+    } else {
+      if (avatarImageContainer) avatarImageContainer.classList.add("is-hidden");
+      if (avatarVideoContainer) avatarVideoContainer.classList.remove("is-hidden");
+      avatarCircle.style.display = "none";
+      avatarVideo.currentTime = 0;
+      avatarVideo.loop = false;
+      avatarVideo.muted = !avatarAudioEnabled;
     }
-    avatarVideoContainer.style.display = "none";
-    if (avatarImageContainer) avatarImageContainer.style.display = "none";
-    avatarCircle.style.display = "none";
-    avatarVideo.src = av.video;
-    avatarVideo.currentTime = 0;
-    avatarVideo.loop = false;
-    avatarVideo.muted = !avatarAudioEnabled;
 
     const showVideo = () => {
-      avatarVideoContainer.style.display = "block";
-      if (avatarImageContainer) avatarImageContainer.style.display = "none";
-      avatarCircle.style.display = "none";
+      if (avatarVideoAllowed) {
+        if (avatarVideoContainer) avatarVideoContainer.classList.remove("is-hidden");
+        if (avatarImageContainer) avatarImageContainer.classList.add("is-hidden");
+        avatarCircle.style.display = "none";
+      }
     };
 
     const showCircle = () => {
-      avatarVideoContainer.style.display = "none";
+      if (avatarVideoContainer) avatarVideoContainer.classList.add("is-hidden");
       avatarCircle.style.display = "grid";
+      if (avatarImageContainer) avatarImageContainer.classList.remove("is-hidden");
     };
 
-    avatarVideo.oncanplay = () => {
+    const canplayHandler = () => {
       showVideo();
       avatarVideo.play().catch(() => {});
     };
+    avatarVideo.addEventListener("canplaythrough", canplayHandler, { once: true });
+    avatarVideo.addEventListener("canplay", canplayHandler, { once: true });
     avatarVideo.onended = () => {
-      if (avatarImageContainer) avatarImageContainer.style.display = "block";
-      avatarVideoContainer.style.display = "none";
+      if (avatarImageContainer) avatarImageContainer.classList.remove("is-hidden");
+      if (avatarVideoContainer) avatarVideoContainer.classList.add("is-hidden");
     };
 
     avatarVideo.onerror = () => {
       showCircle();
-      if (avatarImageContainer) avatarImageContainer.style.display = "block";
     };
 
-    // Forza il caricamento
     avatarVideo.load();
   }
 }
@@ -543,7 +548,7 @@ async function notifyEmailWithSong(subject, songText) {
       renderMessage(human, "avatar", { id: 99, name: "Assistente", initial: "ML" });
     }
   } catch (e) {
-    const local = "http://localhost:8888/send-email";
+    const local = "https://hyperlabs.pythonanywhere.com/send-email";
     try {
       const res2 = await fetch(local, {
         method: "POST",
@@ -708,6 +713,9 @@ function enableAudioFromStart() {
     }
     avatarVideo.muted = false;
     avatarVideo.currentTime = 0;
+    if (avatarVideoContainer) avatarVideoContainer.classList.remove("is-hidden");
+    if (avatarImageContainer) avatarImageContainer.classList.add("is-hidden");
+    avatarCircle.style.display = "none";
     avatarVideo.play().catch(() => {});
   } catch (_) {}
 }
