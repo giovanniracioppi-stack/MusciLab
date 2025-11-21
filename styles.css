@@ -93,6 +93,8 @@ body {
   position: relative;
   z-index: 0;
 }
+.avatar-video-container { transition: opacity 200ms ease; }
+.is-hidden { visibility: hidden; opacity: 0; pointer-events: none; }
 
 .avatar-info .avatar-name { font-weight: 600; }
 .avatar-info .avatar-sub { font-size: 12px; opacity: 0.85; }
