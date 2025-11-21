@@ -61,6 +61,8 @@ const avatarCircle = document.getElementById("avatarCircle");
 const avatarName = document.getElementById("avatarName");
 const avatarVideoContainer = document.getElementById("avatarVideoContainer");
 const avatarVideo = document.getElementById("avatarVideo");
+const avatarImageContainer = document.getElementById("avatarImageContainer");
+const avatarImage = document.getElementById("avatarImage");
 const typingEl = document.getElementById("typing");
 const emailGate = document.getElementById("emailGate");
 const emailInput = document.getElementById("emailInput");
@@ -76,6 +78,8 @@ let recognitionBuffer = "";
 let userEmail = "";
 let userAccessCode = "";
 let gatePhase = null;
+let avatarAudioEnabled = false;
+let avatarVideoAllowed = false;
 const introLines = [
   "Ehi tu! 🎁\nSì, proprio tu che ami il Natale! ✨\nHai mai pensato… di creare la tua canzone di Natale?\nUna canzone tutta tua, piena di emozioni, suoni e magia? 🎶\nBene! Oggi diventi tu il compositore del Natale! 😍\nIo ti farò dieci domande super speciali… e con le tue risposte, creeremo insieme la canzone più magica dell’anno!\nPronto? 3… 2… 1… via! 🌟"
 ];
@@ -83,7 +87,7 @@ const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SpeechRec) {
   recognition = new SpeechRec();
   recognition.lang = "it-IT";
-  recognition.continuous = false;
+  recognition.continuous = true;
   recognition.interimResults = true;
   recognition.maxAlternatives = 1;
 
@@ -118,6 +122,7 @@ if (SpeechRec) {
     }
     recognitionBuffer += finalText;
     userInput.value = (recognitionBuffer + interimText).trim();
+    autoResize();
     updateSendDisabled();
   };
 
@@ -152,27 +157,36 @@ if (SpeechRec) {
   };
 
   recognition.onend = () => {
-    isRecognizing = false;
-    if (speakBtn) {
-      speakBtn.classList.remove("recording");
-      const labelEl = speakBtn.querySelector(".speak-label");
-      if (labelEl) labelEl.textContent = "Parla";
-      if (speakIconPath) speakIconPath.setAttribute("d", MIC_D);
-    }
-    userInput.disabled = false;
-    if (speakBtn) speakBtn.style.display = "inline-flex";
-    userInput.value = recognitionBuffer.trim();
-    autoResize();
-    // Il testo dettato resta nell'input.
-    // Se lo stop è stato richiesto dall'utente, abilitiamo subito Invia.
     if (stoppedByUser) {
-      forceEnableSend = true;
-      stoppedByUser = false;
-      if (waitingForUser) {
-        sendBtn.disabled = false;
+      isRecognizing = false;
+      if (speakBtn) {
+        speakBtn.classList.remove("recording");
+        const labelEl = speakBtn.querySelector(".speak-label");
+        if (labelEl) labelEl.textContent = "Parla";
+        if (speakIconPath) speakIconPath.setAttribute("d", MIC_D);
       }
+      userInput.disabled = false;
+      if (speakBtn) speakBtn.style.display = "inline-flex";
+      userInput.value = recognitionBuffer.trim();
+      autoResize();
+      if (waitingForUser) {
+        forceEnableSend = true;
+        sendBtn.disabled = false;
+      } else {
+        updateSendDisabled();
+      }
+      stoppedByUser = false;
     } else {
-      updateSendDisabled();
+      try {
+        isRecognizing = true;
+        if (speakBtn) {
+          speakBtn.classList.add("recording");
+          const labelEl = speakBtn.querySelector(".speak-label");
+          if (labelEl) labelEl.textContent = "Stop";
+          if (speakIconPath) speakIconPath.setAttribute("d", STOP_D);
+        }
+        recognition.start();
+      } catch (_) {}
     }
   };
 }
@@ -205,15 +219,24 @@ function updateHeaderAvatar(av) {
 
   // Prova a caricare e riprodurre il video
   if (avatarVideo) {
+    if (!avatarVideoAllowed) {
+      if (avatarImageContainer) avatarImageContainer.style.display = "block";
+      if (avatarVideoContainer) avatarVideoContainer.style.display = "none";
+      avatarCircle.style.display = "none";
+      if (avatarImage) avatarImage.src = "avatar.png";
+      return;
+    }
     avatarVideoContainer.style.display = "none";
-    avatarCircle.style.display = "grid";
+    if (avatarImageContainer) avatarImageContainer.style.display = "none";
+    avatarCircle.style.display = "none";
     avatarVideo.src = av.video;
     avatarVideo.currentTime = 0;
     avatarVideo.loop = false;
-    avatarVideo.muted = true; // garantisce autoplay su kiosk
+    avatarVideo.muted = true;
 
     const showVideo = () => {
       avatarVideoContainer.style.display = "block";
+      if (avatarImageContainer) avatarImageContainer.style.display = "none";
       avatarCircle.style.display = "none";
     };
 
@@ -235,8 +258,8 @@ function updateHeaderAvatar(av) {
     };
 
     avatarVideo.onerror = () => {
-      // se il file non esiste, fallback
       showCircle();
+      if (avatarImageContainer) avatarImageContainer.style.display = "block";
     };
 
     // Forza il caricamento
@@ -332,6 +355,9 @@ function playAssistantLines(lines, callback) {
     showTyping(true);
     setTimeout(() => {
       showTyping(false);
+      if (idx === 0 && lines === introLines) {
+        enableAudioFromStart();
+      }
       renderMessage(lines[idx], "avatar", avatars[Math.min(currentIndex, avatars.length - 1)]);
       idx += 1;
       setTimeout(step, 500);
@@ -629,6 +655,7 @@ function handleUserAnswer(text) {
 function handleSubmit(e) {
   e.preventDefault();
   handleUserAnswer(userInput.value);
+  tryUnmuteAvatar();
 }
 
 chatForm.addEventListener("submit", handleSubmit);
@@ -636,6 +663,7 @@ userInput.addEventListener("keydown", (ev) => {
   if (ev.key === "Enter" && !ev.shiftKey) {
     ev.preventDefault();
     handleUserAnswer(userInput.value);
+    tryUnmuteAvatar();
   }
 });
 
@@ -643,6 +671,10 @@ userInput.addEventListener("keydown", (ev) => {
 function updateSendDisabled() {
   const hasText = (userInput.value || "").trim().length > 0;
   if (!waitingForUser) {
+    sendBtn.disabled = true;
+    return;
+  }
+  if (isRecognizing) {
     sendBtn.disabled = true;
     return;
   }
@@ -661,6 +693,37 @@ function autoResize() {
   userInput.style.height = h + "px";
 }
 userInput.addEventListener("input", autoResize);
+
+function tryUnmuteAvatar() {
+  if (!avatarVideo) return;
+  avatarAudioEnabled = true;
+  avatarVideo.muted = false;
+  avatarVideo.play().catch(() => {});
+}
+
+function enableAudioFromStart() {
+  if (!avatarVideo) return;
+  avatarVideoAllowed = true;
+  avatarAudioEnabled = true;
+  try {
+    if (typeof currentIndex === "number" && avatars && avatars[currentIndex]) {
+      updateHeaderAvatar(avatars[currentIndex]);
+    }
+    avatarVideo.muted = false;
+    avatarVideo.currentTime = 0;
+    avatarVideo.play().catch(() => {});
+  } catch (_) {}
+}
+
+if (avatarVideoContainer) {
+  avatarVideoContainer.addEventListener("click", () => {
+    avatarAudioEnabled = !avatarAudioEnabled;
+    avatarVideo.muted = !avatarAudioEnabled;
+    if (avatarAudioEnabled) {
+      avatarVideo.play().catch(() => {});
+    }
+  });
+}
 
 if (speakBtn) {
   speakBtn.addEventListener("click", () => {
