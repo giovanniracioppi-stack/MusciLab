@@ -548,32 +548,9 @@ async function notifyEmailWithSong(subject, songText) {
       renderMessage(human, "avatar", { id: 99, name: "Assistente", initial: "ML" });
     }
   } catch (e) {
-    const local = "https://hyperlabs.pythonanywhere.com/send-email";
-    try {
-      const res2 = await fetch(local, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: recipients, subject, text: bodyText, html: bodyHtml }),
-      });
-      if (res2.ok) {
-        renderMessage("Email inviata! Controlla la tua casella.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
-        done = true;
-      } else {
-        let detail = "";
-        let code = "";
-        try {
-          const j = await res2.json();
-          code = j && j.error ? String(j.error) : "";
-          detail = j && (j.detail || j.error || "");
-        } catch (_) {
-          try { detail = await res2.text(); } catch (_) {}
-        }
-        const human = emailErrorMessage(code, detail, res2.status);
-        renderMessage(human, "avatar", { id: 99, name: "Assistente", initial: "ML" });
-      }
-    } catch (e2) {
-      renderMessage("Invio email non riuscito: problema di rete o backend non raggiungibile.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
-    }
+          const human = emailErrorMessage(code, detail, res.status);
+      renderMessage(human, "avatar", { id: 99, name: "Assistente", initial: "ML" });
+
   }
   userEmail = "";
   userAccessCode = "";
