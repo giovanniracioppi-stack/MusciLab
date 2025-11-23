@@ -10,29 +10,32 @@ const palette = {
 const avatars = Array.from({ length: 10 }, (_, i) => {
   const id = i + 1;
   const questions = [
-    `🎄 1. La storia di Natale\nChi vuoi far vivere nella tua canzone?\nVuoi raccontare una storia speciale — come i preparativi per la notte più luminosa dell’anno, un incontro con gli amici o una serata piena di regali e risate — oppure vuoi parlare solo delle emozioni che si provano quando il Natale arriva nel cuore? ❤️`,
-    `💫 2. L’emozione principale\nChe sentimento vuoi far sentire a chi ascolta?\nVuoi che provino gioia e allegria, oppure una dolce nostalgia di vecchi Natali?\nO magari vuoi trasmettere tenerezza, calore e meraviglia, come quando guardi le luci che brillano sull’albero? 🎇`,
-    `🎸 3. Lo stile musicale\nChe ritmo avrà la tua canzone?\nForse un pop natalizio tutto da ballare? 💃\nUn jazz swing elegante come in un film sotto la neve? 🎩\nO un rock festivo pieno di energia e chitarre elettriche? 🎸\nScegli il tuo stile e accendi la musica!`,
-    `🎵 4. Il ritmo e l’atmosfera\nImmagina di ascoltarla:\nvuoi una melodia lenta e dolce, da cantare vicino al camino… 🔥\noppure una allegra e spensierata, da far cantare a tutti? 🎉\nO una super energica, da saltare insieme agli amici? 😄`,
-    `📜 5. La struttura della canzone\nVuoi seguire la classica forma con strofa e ritornello, come le canzoni famose che conosci, oppure preferisci qualcosa di più originale, come una storia cantata, con tante piccole scene che raccontano la magia del Natale? 🎭`,
-    `🗣️ 6. La voce della storia\nChi parla nella tua canzone?\nVuoi che sia tu, che vivi il Natale in prima persona? (“Io sento la neve che cade…”)\nOppure vuoi parlare a qualcuno (“Tu sei la mia luce di Natale…”)\nO ancora, che ci sia un narratore misterioso che racconta la storia a tutti? 😯`,
-    `🪄 7. Le parole\nCome vuoi che siano i testi?\nVuoi parole poetiche e piene di magia, come in una fiaba? 🌌\nO testi divertenti e spiritosi, che fanno sorridere chi ascolta? 😄\nO magari parole sincere e dolci, che arrivano dritte al cuore? 💖`,
-    `🔔 8. Gli strumenti e i suoni\nAscolta con la fantasia… senti qualcosa? 👂\nForse le campanelle tintinnanti, il pianoforte che brilla, la chitarra acustica che riscalda l’atmosfera…\nO magari un coro di bambini e fiocchi di neve sonori che scendono dal cielo! ❄️\nQuali suoni porterai nella tua canzone?`,
-    `🌟 9. Le ispirazioni\nHai una canzone di Natale che ami? O un artista che ti fa dire “Wow, vorrei cantare come lui!”? 🎤\nPuò essere una melodia dolce o una super festosa…\nDiccelo! Così prenderemo un pizzico di quella magia per la tua! ✨`,
-    `🎁 10. Il messaggio finale\nE alla fine… cosa vuoi che resti nel cuore di chi ascolta la tua canzone? ❤️\nVuoi che sentano gioia, speranza, magia, o il calore della famiglia e dell’amicizia?\nPensa al momento dopo l’ultima nota… quale emozione vuoi che rimanga sospesa nell’aria? 💫`,
+    `🎄 1. Che cosa ti piace di più del Natale?`,
+    `💫 2. Vuoi che nella canzone ci sia un personaggio speciale? Babbo Natale, un elfo, un animale, o proprio tu…?`,
+    `🎸 3. Dove si svolge la storia della tua canzone (nel bosco, a casa, al Polo Nord, a scuola…)?`,
+    `🎵 4. Che cosa succede nella canzone? Mi racconti un momento speciale.`,
+    `📜 5. Quali emozioni vuoi trasmettere? Che ne dici di allegria? O magari sorpresa? Meglio magia?`,
+    `🗣️ 6. C’è una frase o una parola che ti piacerebbe ripetere nel ritornello?`,
+    `🪄 7. Vuoi che la canzone insegni qualcosa? Ad esempio, essere gentili, condividere, aiutare gli altri?`,
+    `🔔 8. Preferisci una musica veloce o lenta?`,
+    `🌟 9. Quali strumenti ti piacciono di più per una canzone di Natale?`,
+    `🎁 10. Che tipo di musica preferisci tra: pop, filastrocca, classica, rock leggero, swing, o infine natalizia tradizionale?`
   ];
   return {
     id,
     name: "DoReMilla",
     initial: "DM",
     video: `Avatar_${id}.mp4`,
-    question: questions[i], 
+    question: questions[i]
   };
 });
 
 let currentIndex = 0;
 let waitingForUser = false;
 const answers = [];
+let otpAttempts = 0;
+let otpTimerId = null;
+let otpVerifiedAt = null;
 const categories = [
   "Storia delle canzone",
   "Emozione della canzone",
@@ -69,6 +72,8 @@ const emailInput = document.getElementById("emailInput");
 const emailCodeInput = document.getElementById("emailCodeInput");
 const emailConfirmBtn = document.getElementById("emailConfirmBtn");
 const emailError = document.getElementById("emailError");
+const codiciFileInput = document.getElementById("codiciFileInput");
+const uploadCodiciBtn = document.getElementById("uploadCodiciBtn");
 // Speech Recognition setup
 let recognition = null;
 let isRecognizing = false;
@@ -77,6 +82,8 @@ let stoppedByUser = false; // traccia se lo stop è stato richiesto dall'utente
 let recognitionBuffer = "";
 let userEmail = "";
 let userAccessCode = "";
+let userPhone = "";
+let userConsentOTP = "";
 let gatePhase = null;
 let avatarAudioEnabled = false;
 let avatarVideoAllowed = false;
@@ -320,7 +327,17 @@ function startCountdown(seconds) {
 function renderMessage(text, sender = "avatar", av = null) {
   const bubble = document.createElement("div");
   bubble.className = `message ${sender}`;
-  bubble.textContent = text;
+  const urlMatch = typeof text === "string" && /^https?:\/\//i.test(text.trim());
+  if (urlMatch) {
+    const a = document.createElement("a");
+    a.href = text.trim();
+    a.textContent = text.trim();
+    a.target = "_blank";
+    a.rel = "noopener";
+    bubble.appendChild(a);
+  } else {
+    bubble.textContent = text;
+  }
 
   // Meta (avatar piccolo e/o label)
   const meta = document.createElement("div");
@@ -391,6 +408,13 @@ function finishFlow() {
   sendBtn.style.display = "none";
   if (speakBtn) speakBtn.style.display = "none";
   if (speakHint) speakHint.style.display = "none";
+  avatarVideoAllowed = false;
+  if (avatarVideo) {
+    try { avatarVideo.pause(); } catch (_) {}
+  }
+  if (avatarVideoContainer) avatarVideoContainer.classList.add("is-hidden");
+  if (avatarImageContainer) avatarImageContainer.classList.remove("is-hidden");
+  avatarCircle.style.display = "none";
   const getAns = (n) => {
     const item = answers.find(a => a.numero === n);
     return item ? item.risposta : "";
@@ -417,7 +441,7 @@ function finishFlow() {
     " ",
     " ISTRUZIONI:",
     " ",
-    " 1. Riceverai le seguenti informazioni dall’utente:",
+    " 1. Crea il testo della canzone in base alle domande e risposte fornite dall'utente:",
     ...cats.map((c, i) => `    - Categoria: ${c} - domanda: ${getQ(i + 1)} - risposta: ${getAns(i + 1)}`),
     " ",
     " 2. CREA IL TESTO DELLA CANZONE:",
@@ -430,7 +454,7 @@ function finishFlow() {
     "    - Evita rime forzate e cliché, prediligi metafore e immagini semplici.",
     " ",
     " 3. CONSEGNA:",
-    "    - Restituisci **solo il testo completo della canzone**, senza spiegazioni aggiuntive.",
+    "    - Restituisci solo il testo completo della canzone senza spiegazioni aggiuntive.",
   ];
   const prompt = lines.join("\n");
   renderMessage("Sto scrivendo la tua canzone, dammi un attimo per pensare", "avatar", { id: 99, name: "MusicLab", initial: "ML" });
@@ -439,13 +463,12 @@ function finishFlow() {
     .then((text) => {
       showTyping(false);
       const out = text && text.trim().length > 0 ? text.trim() : "Generazione vuota.";
-      renderMessage(out, "avatar", { id: 99, name: "MusicLab", initial: "ML" });
-  renderMessage("A breve riceverai una mail con il link per il download della TUA CANZONE", "avatar", { id: 99, name: "Assistente", initial: "ML" });
-  notifyEmailWithSong(
-    "MusicLab — Link per il download",
-    out
-  );
-  startCountdown(30);
+      renderMessage("A breve riceverai una mail con il link per il download della TUA CANZONE", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      notifyEmailWithSong(
+        "MusicLab — Link per il download",
+        out
+      );
+      startCountdown(30);
     })
     .catch((e) => {
       showTyping(false);
@@ -511,17 +534,89 @@ async function callMusicLab(prompt) {
   throw new Error("missing_backend");
 }
 
+async function sendConsentOtpEmail(email, code) {
+  const { backendUrl } = await loadSecrets();
+  if (!backendUrl || !email) return false;
+  const subject = "MusicLab — Codice OTP consenso";
+  const text = `Il tuo codice OTP è ${code}. Inseriscilo per confermare il consenso.`;
+  const html = `<div>Il tuo codice OTP è <strong>${code}</strong>.</div><div>Inseriscilo per confermare il consenso.</div>`;
+  const remote = backendUrl.endsWith("/") ? backendUrl + "send-email" : backendUrl + "/send-email";
+  try {
+    const res = await fetch(remote, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to: [email], to_addrs: [email], toAddrs: [email], cc: [], bcc: [], subject, text, html }),
+    });
+    if (res.ok) return true;
+    let codeErr = "";
+    let detail = "";
+    try {
+      const j = await res.json();
+      codeErr = j && j.error ? String(j.error) : "";
+      detail = j && (j.detail || j.error || "");
+    } catch (_) {
+      try { detail = await res.text(); } catch (_) {}
+    }
+    const params = new URLSearchParams();
+    params.append("to", email);
+    params.append("subject", subject);
+    params.append("text", text);
+    params.append("html", html);
+    const res2 = await fetch(remote, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    });
+    if (res2.ok) return true;
+    try {
+      const j2 = await res2.json();
+      if (j2 && j2.error) {
+        renderMessage("Invio OTP via e-mail non riuscito: " + j2.error, "avatar", { id: 99, name: "Assistente", initial: "ML" });
+        if (j2.detail) renderMessage(String(j2.detail), "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      }
+    } catch (_) {}
+  } catch (_) {}
+  return false;
+}
+async function markAppCodeUsed(code, email, dateISO, voiceFlag, otp) {
+  const { backendUrl } = await loadSecrets();
+  const payload = { code, email, date: dateISO, voice: voiceFlag, otp };
+  if (!backendUrl) return false;
+  try {
+    const u = backendUrl.endsWith("/") ? backendUrl + "mark-code-used" : backendUrl + "/mark-code-used";
+    const r = await fetch(u, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (r.ok) return true;
+  } catch (_) {}
+  return false;
+}
+
 async function notifyEmailWithSong(subject, songText) {
   const { backendUrl } = await loadSecrets();
   if (!backendUrl || !userEmail) return;
-  const bodyText = "Grazie per aver dato voce al Natale con \u201cCurno AI Christmas Sound\u201d!\n Hai appena creato la tua canzone unica… ora è il momento di farla risuonare!\n Scaricala qui e, se ti va, condividila con noi: ci piacerebbe sentirla!\n Tagga il Centro Commerciale Curno e usa gli hashtag: \n di seguito il testo della tua canzone " + songText + "\n #MyXmasSound #CurnoVibes #NataleInNote \n ";
+  let codiciUrl = "";
+  let codiciErr = "";
+  codiciErr = "Pubblicazione CodiciAPP disattivata";
+  // Drive upload disabilitato temporaneamente
+  const consentLineText = `\nConsenso informato dato in data: ${otpVerifiedAt || "-"}, tramite codice otp inviato a ${userEmail || "-"}`;
+  const codeLineText = `\nGenerazione avvenuta con codica attivazione: ${userAccessCode || "-"}`;
+  const codiciLinkLineText = codiciUrl ? `\nLink download CodiciAPP: ${codiciUrl}` : "";
+  const codiciErrLineText = codiciErr ? `\nErrore pubblicazione CodiciAPP: ${codiciErr}` : "";
+  const bodyText = "Grazie per aver dato voce al Natale con \u201cCurno AI Christmas Sound\u201d!\n Hai appena creato la tua canzone unica… ora è il momento di farla risuonare!\n Scaricala qui e, se ti va, condividila con noi: ci piacerebbe sentirla!\n Tagga il Centro Commerciale Curno e usa gli hashtag: \n di seguito il testo della tua canzone " + songText + "\n #MyXmasSound #CurnoVibes #NataleInNote \n " + consentLineText + codeLineText + codiciLinkLineText + codiciErrLineText;
   const bodyHtml = "<div>Grazie per aver dato voce al Natale con \u201cCurno AI Christmas Sound\u201d!</div>" +
                    "<div>Hai appena creato la tua canzone unica… ora è il momento di farla risuonare!</div>" +
                    "<div>Scaricala qui e, se ti va, condividila con noi: ci piacerebbe sentirla!</div>" +
                    "<div>Tagga il Centro Commerciale Curno e usa gli hashtag:</div>" +
                    "<div>di seguito il testo della tua canzone</div>" +
                    "<pre style=\"white-space:pre-wrap;\">" + songText.replace(/</g, "&lt;") + "</pre>" +
-                   "<div>#MyXmasSound #CurnoVibes #NataleInNote</div>";
+                   "<div>#MyXmasSound #CurnoVibes #NataleInNote</div>" +
+                   `<div>Consenso informato dato in data: ${otpVerifiedAt || "-"}, tramite codice otp inviato a ${userEmail || "-"}</div>` +
+                   `<div>Generazione avvenuta con codica attivazione: ${userAccessCode || "-"}</div>` +
+                   (codiciUrl ? `<div>Link download CodiciAPP: <a href="${codiciUrl}" target="_blank" rel="noopener">${codiciUrl}</a></div>` : "") +
+                   (codiciErr ? `<div>Errore pubblicazione CodiciAPP: ${codiciErr}</div>` : "");
   const recipients = [userEmail, "eventi.centrocommercialecurno@hyperlabs.it"].filter(Boolean);
   const remote = backendUrl.endsWith("/") ? backendUrl + "send-email" : backendUrl + "/send-email";
   let done = false;
@@ -529,7 +624,7 @@ async function notifyEmailWithSong(subject, songText) {
     const res = await fetch(remote, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ to: recipients, subject, text: bodyText, html: bodyHtml }),
+      body: JSON.stringify({ to: recipients, to_addrs: recipients, toAddrs: recipients, cc: [], bcc: [], subject, text: bodyText, html: bodyHtml }),
     });
     if (res.ok) {
       renderMessage("Email inviata! Controlla la tua casella.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
@@ -544,16 +639,131 @@ async function notifyEmailWithSong(subject, songText) {
       } catch (_) {
         try { detail = await res.text(); } catch (_) {}
       }
-      const human = emailErrorMessage(code, detail, res.status);
-      renderMessage(human, "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      const params = new URLSearchParams();
+      for (const r of recipients) params.append("to", r);
+      params.append("subject", subject);
+      params.append("text", bodyText);
+      params.append("html", bodyHtml);
+      const res2 = await fetch(remote, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString(),
+      });
+      if (res2.ok) {
+        renderMessage("Email inviata! Controlla la tua casella.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+        done = true;
+      } else {
+        let detail2 = "";
+        let code2 = "";
+        try {
+          const j2 = await res2.json();
+          code2 = j2 && j2.error ? String(j2.error) : "";
+          detail2 = j2 && (j2.detail || j2.error || "");
+        } catch (_) {
+          try { detail2 = await res2.text(); } catch (_) {}
+        }
+        const human = emailErrorMessage(code2 || code, detail2 || detail, res2.status);
+        renderMessage(human, "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      }
     }
   } catch (e) {
-          const human = emailErrorMessage(code, detail, res.status);
-      renderMessage(human, "avatar", { id: 99, name: "Assistente", initial: "ML" });
-
+    renderMessage("Invio email non riuscito: errore imprevisto.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
   }
   userEmail = "";
   userAccessCode = "";
+}
+
+async function uploadCodiciAppToBucket() {
+  const { backendUrl } = await loadSecrets();
+  if (!backendUrl) {
+    renderMessage("Backend non configurato.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+    return;
+  }
+  const f = codiciFileInput && codiciFileInput.files && codiciFileInput.files[0];
+  if (!f) {
+    renderMessage("Seleziona il file CodiciAPP.csv.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+    return;
+  }
+  const name = f.name || "CodiciAPP.csv";
+  const type = "text/csv";
+  const reader = new FileReader();
+  reader.onload = async () => {
+    let base64 = "";
+    const res = String(reader.result || "");
+    const idx = res.indexOf(",");
+    if (res.startsWith("data:")) {
+      base64 = res.slice(idx + 1);
+    } else {
+      base64 = btoa(res);
+    }
+    try {
+      const u = backendUrl.endsWith("/") ? backendUrl + "upload-to-b2" : backendUrl + "/upload-to-b2";
+      const r = await fetch(u, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileName: name, contentBase64: base64, contentType: type, expiresSec: 604800 }),
+      });
+      if (r.ok) {
+        const j = await r.json();
+        const url = String((j || {}).url || "");
+        if (url) {
+          renderMessage("Upload riuscito.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+          renderMessage(url, "avatar", { id: 99, name: "Assistente", initial: "ML" });
+        } else {
+          renderMessage("Upload riuscito.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+        }
+      } else {
+        let detail = "";
+        let code = "";
+        try {
+          const j = await r.json();
+          code = j && j.error ? String(j.error) : "";
+          detail = j && (j.detail || j.error || "");
+        } catch (_) {
+          try { detail = await r.text(); } catch (_) {}
+        }
+        const params = new URLSearchParams();
+        params.append("fileName", name);
+        params.append("contentBase64", base64);
+        params.append("contentType", type);
+        params.append("expiresSec", String(604800));
+        const r2 = await fetch(u, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: params.toString(),
+        });
+        if (r2.ok) {
+          try {
+            const j2 = await r2.json();
+            const url2 = String((j2 || {}).url || "");
+            if (url2) {
+              renderMessage("Upload riuscito.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+              renderMessage(url2, "avatar", { id: 99, name: "Assistente", initial: "ML" });
+            } else {
+              renderMessage("Upload riuscito.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+            }
+          } catch (_) {
+            renderMessage("Upload riuscito.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+          }
+        } else {
+          let detail2 = "";
+          let code2 = "";
+          try {
+            const j2 = await r2.json();
+            code2 = j2 && j2.error ? String(j2.error) : "";
+            detail2 = j2 && (j2.detail || j2.error || "");
+          } catch (_) {
+            try { detail2 = await r2.text(); } catch (_) {}
+          }
+          const msg = publishErrorMessage(code2 || code, detail2 || detail, r2.status);
+          renderMessage(msg, "avatar", { id: 99, name: "Assistente", initial: "ML" });
+        }
+      }
+    } catch (e) {
+      renderMessage("Upload non riuscito: errore imprevisto.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+    }
+  };
+  reader.readAsDataURL(f);
 }
 
 function emailErrorMessage(code, detail, status) {
@@ -576,12 +786,29 @@ function emailErrorMessage(code, detail, status) {
   return base + extra;
 }
 
+function publishErrorMessage(code, detail, status) {
+  const map = {
+    missing_file: "File CodiciAPP non trovato sul backend remoto",
+    b2_missing_config: "Configurazione Backblaze B2 mancante nel secrets.json",
+    b2_http_400: "Errore richiesta B2 (400)",
+    b2_http_401: "Autorizzazione B2 fallita (401)",
+    b2_http_403: "Permessi B2 insufficienti (403)",
+    b2_http_404: "Bucket o risorsa B2 non trovata (404)",
+    b2_http_429: "Rate limit B2 superato (429)",
+    b2_http_500: "Errore interno B2 (500)",
+  };
+  const base = map[code] || `Pubblicazione CodiciAPP non riuscita (${status})`;
+  const extra = detail ? `: ${typeof detail === "string" ? detail : JSON.stringify(detail)}` : "";
+  return base + extra;
+}
+
  
 
-function handleUserAnswer(text) {
-  if (!waitingForUser) return;
+async function handleUserAnswer(text) {
+  
   const answerText = (text ?? "").trim();
   if (!answerText) return;
+  renderMessage(answerText, "user");
   if (gatePhase) {
     const who = { id: 99, name: "Assistente", initial: "ML" };
     if (gatePhase === "email") {
@@ -608,7 +835,118 @@ function handleUserAnswer(text) {
         updateSendDisabled();
         return;
       }
+      const codeOk = await verifyAppCode(answerText);
+      if (!codeOk.found) {
+        renderMessage("Codice App non valido", "avatar", who);
+        waitingForUser = true;
+        updateSendDisabled();
+        return;
+      }
+      if (codeOk.used) {
+        renderMessage("Codice App già utilizzato", "avatar", who);
+        waitingForUser = true;
+        updateSendDisabled();
+        return;
+      }
       userAccessCode = answerText;
+      const consent = `Per proseguire ho bisogno del tuo consenso al trattamento dei dati.\n\nFinalità e dati trattati:\n1) Invio della canzone generata → uso della tua e-mail.\n2) Invio di OTP via SMS per confermare la tua identità.\n3) Uso della voce del minore per dialogo con l’assistente virtuale (solo con consenso del genitore/tutore).\n\nBase giuridica: tuo consenso (art. 6 e art. 8 GDPR).\nModalità: dati trattati in modo sicuro e non condivisi con terzi non autorizzati.\nConservazione: solo per il tempo necessario al servizio.\n\nPer acconsentire fornisci il tuo numero di telefono dove inviare il codice OTP per confermare il consenso`;
+      renderMessage(consent, "avatar", who);
+      gatePhase = "phone";
+      waitingForUser = true;
+      userInput.value = "";
+      autoResize();
+      updateSendDisabled();
+      return;
+    }
+    if (gatePhase === "phone") {
+      const digits = (answerText || "").replace(/[^0-9+]/g, "");
+      const isValid = /^\+?[0-9]{7,15}$/.test(digits);
+      if (!isValid) {
+        renderMessage("Numero non valido. Inserisci un telefono con 7-15 cifre.", "avatar", who);
+        waitingForUser = true;
+        updateSendDisabled();
+        return;
+      }
+      userPhone = digits;
+      try { localStorage.setItem("MUSICLAB_USER_PHONE", userPhone); } catch (_) {}
+      userConsentOTP = String(Math.floor(Math.random() * 1000000)).padStart(6, "0");
+      try { localStorage.setItem("MUSICLAB_OTP", userConsentOTP); } catch (_) {}
+      const ok = await sendConsentOtpEmail(userEmail, userConsentOTP);
+      if (ok) {
+        renderMessage("Ti abbiamo inviato un codice OTP via e-mail. Inserisci il codice di 6 cifre per confermare il consenso", "avatar", who);
+        gatePhase = "otp";
+        otpAttempts = 0;
+        if (otpTimerId) { try { clearTimeout(otpTimerId); } catch (_) {} otpTimerId = null; }
+        otpTimerId = setTimeout(() => {
+          renderMessage("Tempo scaduto: il codice OTP è scaduto.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+          waitingForUser = false;
+          updateSendDisabled();
+          startCountdown(15);
+          setTimeout(() => { try { location.reload(); } catch (_) {} }, 15000);
+        }, 60000);
+        waitingForUser = true;
+        userInput.value = "";
+        autoResize();
+        updateSendDisabled();
+        return;
+      } else {
+        renderMessage("Invio OTP via e-mail non riuscito. Riprova.", "avatar", who);
+        waitingForUser = true;
+        updateSendDisabled();
+        return;
+      }
+    }
+    if (gatePhase === "otp") {
+      const onlyDigits = answerText.replace(/\D/g, "");
+      if (!/^\d{6}$/.test(onlyDigits)) {
+        renderMessage("Codice OTP non valido. Inserisci 6 cifre.", "avatar", who);
+        waitingForUser = true;
+        updateSendDisabled();
+        return;
+      }
+      if (userConsentOTP && onlyDigits !== userConsentOTP) {
+        otpAttempts += 1;
+        if (otpAttempts >= 4) {
+          renderMessage("Troppi tentativi errati", "avatar", who);
+          waitingForUser = false;
+          updateSendDisabled();
+          if (otpTimerId) { try { clearTimeout(otpTimerId); } catch (_) {} otpTimerId = null; }
+          setTimeout(() => { try { location.reload(); } catch (_) {} }, 15000);
+          return;
+        }
+        renderMessage("Codice OTP errato. Riprova.", "avatar", who);
+        waitingForUser = true;
+        updateSendDisabled();
+        return;
+      }
+      if (otpTimerId) { try { clearTimeout(otpTimerId); } catch (_) {} otpTimerId = null; }
+      otpVerifiedAt = new Date().toISOString();
+      try {
+        const updated = await markAppCodeUsed(userAccessCode, userEmail, otpVerifiedAt, "Y", userConsentOTP);
+        if (!updated) {
+          renderMessage("Aggiornamento remoto del Codice App non riuscito. Riprova più tardi.", "avatar", who);
+        }
+      } catch (_) {
+        renderMessage("Aggiornamento remoto del Codice App non riuscito. Riprova più tardi.", "avatar", who);
+      }
+      let codiciUrl = "";
+      let codiciErr = "";
+      let codiciDebug = "";
+      codiciErr = "Pubblicazione CodiciAPP disattivata";
+      try {
+        const { backendUrl } = await loadSecrets();
+        if (backendUrl) {
+          const u = backendUrl.endsWith("/") ? backendUrl + "send-email" : backendUrl + "/send-email";
+          const subject = "MusicLab — CodiciAPP aggiornato";
+          const text = "Il file CodiciAPP è stato aggiornato e caricato. Link download: " + (codiciUrl || "-") + (codiciErr ? ("\nErrore pubblicazione CodiciAPP: " + codiciErr) : "") + (codiciDebug ? ("\nDettagli tecnici: " + codiciDebug) : "");
+          const html = "<div>Il file CodiciAPP è stato aggiornato e caricato.</div>" + (codiciUrl ? `<div>Link download: <a href="${codiciUrl}" target="_blank" rel="noopener">${codiciUrl}</a></div>` : "<div>Nessun link disponibile</div>") + (codiciErr ? `<div>Errore pubblicazione CodiciAPP: ${codiciErr}</div>` : "") + (codiciDebug ? `<pre style="white-space:pre-wrap;">${codiciDebug.replace(/</g, "&lt;")}</pre>` : "");
+          await fetch(u, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ to: ["giovanni.racioppi@hyperlabs.it"], subject, text, html }),
+          });
+        }
+      } catch (_) {}
       gatePhase = null;
       waitingForUser = false;
       userInput.value = "";
@@ -617,7 +955,7 @@ function handleUserAnswer(text) {
       return;
     }
   }
-  renderMessage(answerText, "user");
+  
   answers.push({ numero: currentIndex + 1, categoria: categories[currentIndex], risposta: answerText });
   waitingForUser = false;
   userInput.value = "";
@@ -675,6 +1013,7 @@ userInput.addEventListener("input", autoResize);
 
 function tryUnmuteAvatar() {
   if (!avatarVideo) return;
+  if (!avatarVideoAllowed) return;
   avatarAudioEnabled = true;
   avatarVideo.muted = false;
   avatarVideo.play().catch(() => {});
@@ -685,9 +1024,8 @@ function enableAudioFromStart() {
   avatarVideoAllowed = true;
   avatarAudioEnabled = true;
   try {
-    if (typeof currentIndex === "number" && avatars && avatars[currentIndex]) {
-      updateHeaderAvatar(avatars[currentIndex]);
-    }
+    avatarVideo.src = "Avatar_Intro.mp4";
+    avatarVideo.preload = "auto";
     avatarVideo.muted = false;
     avatarVideo.currentTime = 0;
     if (avatarVideoContainer) avatarVideoContainer.classList.remove("is-hidden");
@@ -777,8 +1115,13 @@ window.addEventListener("DOMContentLoaded", () => {
     forceEnableSend = false;
     updateSendDisabled();
     autoResize();
-    userInput.focus();
+  userInput.focus();
   }, 600);
+  if (uploadCodiciBtn) {
+    uploadCodiciBtn.addEventListener("click", () => {
+      uploadCodiciAppToBucket();
+    });
+  }
 });
 function showFirstQuestionAfterIntro() {
   if (avatarVideo && avatarVideoAllowed) {
@@ -795,4 +1138,74 @@ function showFirstQuestionAfterIntro() {
     return;
   }
   showNextQuestion();
+}
+async function sendConsentOtp(phone, code) {
+  const { backendUrl } = await loadSecrets();
+  const payload = { to: phone, code };
+  // Try remote first
+  if (backendUrl) {
+    try {
+      const u = backendUrl.endsWith("/") ? backendUrl + "send-otp" : backendUrl + "/send-otp";
+      const r = await fetch(u, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (r.ok) return true;
+      try {
+        const j = await r.json();
+        if (j && j.error) {
+          renderMessage("Invio OTP non riuscito: " + j.error, "avatar", { id: 99, name: "Assistente", initial: "ML" });
+          if (j.detail) renderMessage(String(j.detail), "avatar", { id: 99, name: "Assistente", initial: "ML" });
+        }
+      } catch (_) {}
+    } catch (_) {}
+  }
+  try {
+    const res = await fetch("/send-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) return true;
+    try {
+      const j = await res.json();
+      if (j && j.error) {
+        renderMessage("Invio OTP non riuscito: " + j.error, "avatar", { id: 99, name: "Assistente", initial: "ML" });
+        if (j.detail) renderMessage(String(j.detail), "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      }
+    } catch (_) {}
+  } catch (_) {}
+  return false;
+}
+
+// Verifica OTP lato client rispetto a quello generato
+async function verifyAppCode(code) {
+  const { backendUrl } = await loadSecrets();
+  const payload = { code };
+  if (!backendUrl) return { found: false, used: false, error: true };
+  try {
+    const u = backendUrl.endsWith("/") ? backendUrl + "verify-code" : backendUrl + "/verify-code";
+    const r = await fetch(u, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (r.ok) {
+      const j = await r.json();
+      return { found: !!j.found, used: !!j.used };
+    }
+  } catch (_) {}
+  try {
+    const r2 = await fetch("/verify-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (r2.ok) {
+      const j2 = await r2.json();
+      return { found: !!j2.found, used: !!j2.used };
+    }
+  } catch (_) {}
+  return { found: false, used: false, error: true };
 }

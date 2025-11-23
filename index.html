@@ -24,11 +24,13 @@
         </div>
         <div class="assistant-hero">
           <div id="avatarCircle" class="avatar-circle" aria-hidden="true">ML</div>
-          <div id="avatarImageContainer" class="avatar-video-container">
-            <img id="avatarImage" class="avatar-image-el" src="avatar.png" alt="Avatar" />
-          </div>
-          <div id="avatarVideoContainer" class="avatar-video-container is-hidden" aria-hidden="true">
-            <video id="avatarVideo" class="avatar-video-el" playsinline muted></video>
+          <div class="avatar-stack">
+            <div id="avatarImageContainer" class="avatar-video-container">
+              <img id="avatarImage" class="avatar-image-el" src="avatar.png" alt="Avatar" />
+            </div>
+            <div id="avatarVideoContainer" class="avatar-video-container is-hidden" aria-hidden="true">
+              <video id="avatarVideo" class="avatar-video-el" playsinline muted></video>
+            </div>
           </div>
           <div class="assistant-info">
             <div id="avatarName" class="assistant-title">DoReMilla</div>
@@ -92,6 +94,10 @@
           <button id="sendBtn" class="send" type="submit" aria-label="Invia">Invia</button>
         </form>
       </footer>
+      <!--<div class="tools" style="position:fixed; top:10px; right:10px; display:flex; gap:8px; align-items:center;">
+        <input id="codiciFileInput" type="file" accept=".csv,text/csv" aria-label="Seleziona CodiciAPP.csv" />
+        <button id="uploadCodiciBtn" type="button" class="email-btn" aria-label="Carica CodiciAPP.csv">Carica CodiciAPP</button>
+      </div>-->
     </div>
 
     <script src="app.js"></script>
