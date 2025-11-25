@@ -62,18 +62,22 @@ const MIC_D = "M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0
 const STOP_D = "M6 6h12v12H6z";
 const avatarCircle = document.getElementById("avatarCircle");
 const avatarName = document.getElementById("avatarName");
-const avatarVideoContainer = document.getElementById("avatarVideoContainer");
-const avatarVideo = document.getElementById("avatarVideo");
-const avatarImageContainer = document.getElementById("avatarImageContainer");
-const avatarImage = document.getElementById("avatarImage");
 const typingEl = document.getElementById("typing");
 const emailGate = document.getElementById("emailGate");
+const avatarVideo = document.getElementById("avatarVideo");
+const avatarVideoContainer = document.getElementById("avatarVideoContainer");
+const avatarImageContainer = document.getElementById("avatarImageContainer");
+const avatarImage = document.getElementById("avatarImage");
 const emailInput = document.getElementById("emailInput");
-const emailCodeInput = document.getElementById("emailCodeInput");
 const emailConfirmBtn = document.getElementById("emailConfirmBtn");
 const emailError = document.getElementById("emailError");
+const emailCodeInput = document.getElementById("emailCodeInput");
 const codiciFileInput = document.getElementById("codiciFileInput");
 const uploadCodiciBtn = document.getElementById("uploadCodiciBtn");
+const otpGate = document.getElementById("otpGate");
+const otpInput = document.getElementById("otpInput");
+const otpConfirmBtn = document.getElementById("otpConfirmBtn");
+const otpError = document.getElementById("otpError");
 // Speech Recognition setup
 let recognition = null;
 let isRecognizing = false;
@@ -87,6 +91,7 @@ let userConsentOTP = "";
 let gatePhase = null;
 let avatarAudioEnabled = false;
 let avatarVideoAllowed = false;
+let suggestionsEl = null;
 const introLines = [
   "Ehi tu! 🎁\nSì, proprio tu che ami il Natale! ✨\nHai mai pensato… di creare la tua canzone di Natale?\nUna canzone tutta tua, piena di emozioni, suoni e magia? 🎶\nBene! Oggi diventi tu il compositore del Natale! 😍\nIo ti farò dieci domande super speciali… e con le tue risposte, creeremo insieme la canzone più magica dell’anno!\nPronto? 3… 2… 1… via! 🌟"
 ];
@@ -141,7 +146,7 @@ if (SpeechRec) {
       if (speakIconPath) speakIconPath.setAttribute("d", MIC_D);
     }
     isRecognizing = false;
-    userInput.disabled = false;
+    userInput.disabled = true;
     updateSendDisabled();
     if (speakBtn) speakBtn.style.display = "inline-flex";
     const err = event && event.error ? event.error : "unknown";
@@ -287,9 +292,18 @@ function showTyping(show = true) {
 
 
 function scrollToBottom() {
-  if (chatEl) chatEl.scrollTop = chatEl.scrollHeight;
-  const last = messagesEl.lastElementChild;
-  if (last && typeof last.scrollIntoView === "function") last.scrollIntoView({ block: "end" });
+  try {
+    if (chatEl && typeof chatEl.scrollTo === "function") {
+      chatEl.scrollTo({ top: chatEl.scrollHeight, behavior: "smooth" });
+    } else if (chatEl) {
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+    const last = (chatEl && chatEl.lastElementChild) ? chatEl.lastElementChild : messagesEl.lastElementChild;
+    if (last && typeof last.scrollIntoView === "function") last.scrollIntoView({ block: "end", behavior: "smooth" });
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+  } catch (_) {
+    try { window.scrollTo(0, document.documentElement.scrollHeight); } catch (_) {}
+  }
 }
 
 function startCountdown(seconds) {
@@ -397,6 +411,27 @@ function showNextQuestion() {
     if (speakBtn) speakBtn.disabled = true;
     forceEnableSend = false;
     updateSendDisabled();
+    if (currentIndex === 0) {
+      try { showQuestion1Suggestions(); } catch (_) {}
+    } else if (currentIndex === 1) {
+      try { showQuestion2Suggestions(); } catch (_) {}
+    } else if (currentIndex === 2) {
+      try { showQuestion3Suggestions(); } catch (_) {}
+    } else if (currentIndex === 3) {
+      try { showQuestion4Suggestions(); } catch (_) {}
+    } else if (currentIndex === 4) {
+      try { showQuestion5Suggestions(); } catch (_) {}
+    } else if (currentIndex === 5) {
+      try { showQuestion6Suggestions(); } catch (_) {}
+    } else if (currentIndex === 6) {
+      try { showQuestion7Suggestions(); } catch (_) {}
+    } else if (currentIndex === 7) {
+      try { showQuestion8Suggestions(); } catch (_) {}
+    } else if (currentIndex === 8) {
+      try { showQuestion9Suggestions(); } catch (_) {}
+    } else if (currentIndex === 9) {
+      try { showQuestion10Suggestions(); } catch (_) {}
+    }
     gateAnswerUntilVideoEnds();
   }, 600);
 }
@@ -463,12 +498,8 @@ function finishFlow() {
     .then((text) => {
       showTyping(false);
       const out = text && text.trim().length > 0 ? text.trim() : "Generazione vuota.";
-      renderMessage("A breve riceverai una mail con il link per il download della TUA CANZONE", "avatar", { id: 99, name: "Assistente", initial: "ML" });
-      notifyEmailWithSong(
-        "MusicLab — Link per il download",
-        out
-      );
-      startCountdown(30);
+      renderMessage("Creo anche l'audio della canzone e ti invio il link via email", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      createSongAndEmail(out);
     })
     .catch((e) => {
       showTyping(false);
@@ -498,6 +529,185 @@ async function loadSecrets() {
     return { backendUrl };
   })();
   return secretsPromise;
+}
+
+function buildProducerCreatePayload(lyricsText) {
+  const mv = localStorage.getItem("AIMUSIC_MV") || "FUZZ-2.0 Pro";
+  const instrumental = String(localStorage.getItem("AIMUSIC_INSTRUMENTAL") || "false") === "true";
+  const title = localStorage.getItem("AIMUSIC_TITLE") || "Back to You";
+  const getAns = (n) => {
+    const item = answers.find(a => a.numero === n);
+    return item ? item.risposta : "";
+  };
+  const a7 = getAns(7);
+  const a8 = getAns(8);
+  const a9 = getAns(9);
+  const a10 = getAns(10);
+  const sound = [a7, a8, a9, a10].map(s => String(s || "").trim()).filter(Boolean).join(", ");
+  return {
+    task_type: "create_music",
+    mv,
+    sound: sound || "emotional pop with gentle piano, warm synths, and a catchy beat",
+    lyrics_strength: 0.5,
+    sound_strength: 0.5,
+    make_instrumental: instrumental,
+    title,
+    lyrics: String(lyricsText || "").trim(),
+  };
+}
+
+async function createSongAndEmail(lyricsText) {
+  const { backendUrl } = await loadSecrets();
+  const u = backendUrl.endsWith("/") ? backendUrl + "aimusic-producer-create" : backendUrl + "/aimusic-producer-create";
+  try {
+    const payload = buildProducerCreatePayload(lyricsText);
+    const r = await fetch(u, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ payload }),
+    });
+    if (!r.ok) {
+      const body = await r.text();
+      renderMessage(`Generazione audio non avviata (${r.status}): ${body.slice(0,300)}`, "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      await notifyEmailWithSong("MusicLab — Testo canzone", lyricsText, "");
+      return;
+    }
+    const j = await r.json();
+    const base = (j && j.result) ? j.result : (j || {});
+    let taskId = String(base.task_id || base.taskId || base.id || "");
+    if (!taskId) {
+      const obj = (j || {}).result || j || {};
+      for (const k of Object.keys(obj)) {
+        const v = obj[k];
+        if (k.toLowerCase().includes("task") && (typeof v === "string" || typeof v === "number")) {
+          taskId = String(v);
+          break;
+        }
+      }
+    }
+    if (!taskId) {
+      renderMessage("Generazione audio avviata senza task id.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      await notifyEmailWithSong("MusicLab — Testo canzone", lyricsText, "");
+      return;
+    }
+    renderMessage("Attendo che l'audio sia pronto…", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+    const url = await pollProducerTask(taskId);
+    if (url) {
+      renderMessage(url, "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      await notifyEmailWithSong("MusicLab — Link per il download", lyricsText, url);
+      if (String(localStorage.getItem("AIMUSIC_AUTODOWNLOAD") || "false") === "true") {
+        await autoDownloadSong(url);
+      }
+      if (String(localStorage.getItem("AIMUSIC_AUTORELOAD") || "false") === "true") {
+        startCountdown(30);
+      }
+    } else {
+      renderMessage("Generazione audio completata, ma nessun link trovato.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      await notifyEmailWithSong("MusicLab — Testo canzone", lyricsText, "");
+    }
+  } catch (e) {
+    renderMessage("Errore durante la generazione audio.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+    await notifyEmailWithSong("MusicLab — Testo canzone", lyricsText, "");
+  }
+}
+
+async function pollProducerTask(taskId) {
+  const { backendUrl } = await loadSecrets();
+  const u = backendUrl.endsWith("/") ? backendUrl + "aimusic-task" : backendUrl + "/aimusic-task";
+  const deadline = Date.now() + 120000;
+  while (Date.now() < deadline) {
+    try {
+      const r = await fetch(u, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task_id: taskId }),
+      });
+      if (r.ok) {
+        const j = await r.json();
+        const obj = (j || {}).result || j || {};
+        let url = String(obj.url || obj.audio_url || obj.download_url || "");
+        if (!url && Array.isArray(obj.data) && obj.data.length > 0) {
+          const first = obj.data[0] || {};
+          if (first.audio_url) url = String(first.audio_url || "");
+          else if (first.url) url = String(first.url || "");
+          else if (first.download_url) url = String(first.download_url || "");
+        }
+        url = sanitizeUrl(url);
+        if (!url) {
+          url = findAudioUrl(obj);
+          url = sanitizeUrl(url);
+        }
+        const status = String(obj.status || obj.state || "").toLowerCase();
+        if (url) return url;
+        if (status === "failed" || status === "error") break;
+      }
+    } catch (_) {}
+    await new Promise(res => setTimeout(res, 5000));
+  }
+  return "";
+}
+
+function findAudioUrl(o) {
+  const exts = [".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"];
+  const stack = [o];
+  const seen = new Set();
+  while (stack.length) {
+    const cur = stack.pop();
+    if (!cur || seen.has(cur)) continue;
+    seen.add(cur);
+    if (typeof cur === "string") {
+      let s = cur.trim();
+      s = sanitizeUrl(s);
+      if (/^https?:\/\//i.test(s)) {
+        const low = s.toLowerCase();
+        if (exts.some(e => low.includes(e)) || low.includes("audio") || low.includes("download")) return s;
+      }
+      continue;
+    }
+    if (Array.isArray(cur)) {
+      for (let i = 0; i < cur.length; i++) stack.push(cur[i]);
+      continue;
+    }
+    if (typeof cur === "object") {
+      for (const k of Object.keys(cur)) {
+        const v = cur[k];
+        if (typeof v === "string") {
+          let s = v.trim();
+          s = sanitizeUrl(s);
+          if (/^https?:\/\//i.test(s)) {
+            const low = s.toLowerCase();
+            if (exts.some(e => low.includes(e)) || k.toLowerCase().includes("url") || k.toLowerCase().includes("audio") || low.includes("download")) return s;
+          }
+        } else {
+          stack.push(v);
+        }
+      }
+    }
+  }
+  return "";
+}
+
+function sanitizeUrl(s) {
+  if (!s) return "";
+  let out = String(s).trim();
+  while (out.startsWith("`") || out.startsWith("\"") || out.startsWith("'")) out = out.slice(1).trim();
+  while (out.endsWith("`") || out.endsWith("\"") || out.endsWith("'")) out = out.slice(0, -1).trim();
+  return out;
+}
+
+async function autoDownloadSong(url) {
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "";
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      try { document.body.removeChild(a); } catch (_) {}
+    }, 0);
+  } catch (_) {}
 }
 
 async function callMusicLab(prompt) {
@@ -594,7 +804,7 @@ async function markAppCodeUsed(code, email, dateISO, voiceFlag, otp) {
   return false;
 }
 
-async function notifyEmailWithSong(subject, songText) {
+async function notifyEmailWithSong(subject, songText, songUrl) {
   const { backendUrl } = await loadSecrets();
   if (!backendUrl || !userEmail) return;
   let codiciUrl = "";
@@ -603,9 +813,10 @@ async function notifyEmailWithSong(subject, songText) {
   // Drive upload disabilitato temporaneamente
   const consentLineText = `\nConsenso informato dato in data: ${otpVerifiedAt || "-"}, tramite codice otp inviato a ${userEmail || "-"}`;
   const codeLineText = `\nGenerazione avvenuta con codica attivazione: ${userAccessCode || "-"}`;
+  const songLinkLineText = songUrl ? `\nLink download canzone: ${songUrl}` : "";
   const codiciLinkLineText = codiciUrl ? `\nLink download CodiciAPP: ${codiciUrl}` : "";
   const codiciErrLineText = codiciErr ? `\nErrore pubblicazione CodiciAPP: ${codiciErr}` : "";
-  const bodyText = "Grazie per aver dato voce al Natale con \u201cCurno AI Christmas Sound\u201d!\n Hai appena creato la tua canzone unica… ora è il momento di farla risuonare!\n Scaricala qui e, se ti va, condividila con noi: ci piacerebbe sentirla!\n Tagga il Centro Commerciale Curno e usa gli hashtag: \n di seguito il testo della tua canzone " + songText + "\n #MyXmasSound #CurnoVibes #NataleInNote \n " + consentLineText + codeLineText + codiciLinkLineText + codiciErrLineText;
+  const bodyText = "Grazie per aver dato voce al Natale con \u201cCurno AI Christmas Sound\u201d!\n Hai appena creato la tua canzone unica… ora è il momento di farla risuonare!\n Scaricala qui e, se ti va, condividila con noi: ci piacerebbe sentirla!\n Tagga il Centro Commerciale Curno e usa gli hashtag: \n di seguito il testo della tua canzone " + songText + "\n #MyXmasSound #CurnoVibes #NataleInNote \n " + consentLineText + codeLineText + songLinkLineText + codiciLinkLineText + codiciErrLineText;
   const bodyHtml = "<div>Grazie per aver dato voce al Natale con \u201cCurno AI Christmas Sound\u201d!</div>" +
                    "<div>Hai appena creato la tua canzone unica… ora è il momento di farla risuonare!</div>" +
                    "<div>Scaricala qui e, se ti va, condividila con noi: ci piacerebbe sentirla!</div>" +
@@ -615,6 +826,7 @@ async function notifyEmailWithSong(subject, songText) {
                    "<div>#MyXmasSound #CurnoVibes #NataleInNote</div>" +
                    `<div>Consenso informato dato in data: ${otpVerifiedAt || "-"}, tramite codice otp inviato a ${userEmail || "-"}</div>` +
                    `<div>Generazione avvenuta con codica attivazione: ${userAccessCode || "-"}</div>` +
+                   (songUrl ? `<div>Link download canzone: <a href="${songUrl}" target="_blank" rel="noopener">${songUrl}</a></div>` : "") +
                    (codiciUrl ? `<div>Link download CodiciAPP: <a href="${codiciUrl}" target="_blank" rel="noopener">${codiciUrl}</a></div>` : "") +
                    (codiciErr ? `<div>Errore pubblicazione CodiciAPP: ${codiciErr}</div>` : "");
   const recipients = [userEmail, "eventi.centrocommercialecurno@hyperlabs.it"].filter(Boolean);
@@ -822,8 +1034,16 @@ async function handleUserAnswer(text) {
       userEmail = answerText;
       renderMessage("Perfetto! Ora inserisci il codice di accesso", "avatar", who);
       gatePhase = "code";
+      try {
+        userInput.setAttribute("inputmode", "text");
+        userInput.setAttribute("autocomplete", "off");
+        userInput.placeholder = "Scrivi il codice e premi Invio…";
+      } catch (_) {}
+      if (speakBtn) speakBtn.disabled = false;
+      if (emailGate) emailGate.style.display = "none";
       waitingForUser = true;
       userInput.value = "";
+      userInput.disabled = false;
       updateSendDisabled();
       autoResize();
       return;
@@ -835,7 +1055,8 @@ async function handleUserAnswer(text) {
         updateSendDisabled();
         return;
       }
-      const codeOk = await verifyAppCode(answerText);
+      const codeUpper = String(answerText || "").trim().toUpperCase();
+      const codeOk = await verifyAppCode(codeUpper);
       if (!codeOk.found) {
         renderMessage("Codice App non valido", "avatar", who);
         waitingForUser = true;
@@ -848,9 +1069,10 @@ async function handleUserAnswer(text) {
         updateSendDisabled();
         return;
       }
-      userAccessCode = answerText;
-      const consent = `Per proseguire ho bisogno del tuo consenso al trattamento dei dati.\n\nFinalità e dati trattati:\n1) Invio della canzone generata → uso della tua e-mail.\n2) Invio di OTP via SMS per confermare la tua identità.\n3) Uso della voce del minore per dialogo con l’assistente virtuale (solo con consenso del genitore/tutore).\n\nBase giuridica: tuo consenso (art. 6 e art. 8 GDPR).\nModalità: dati trattati in modo sicuro e non condivisi con terzi non autorizzati.\nConservazione: solo per il tempo necessario al servizio.\n\nPer acconsentire fornisci il tuo numero di telefono dove inviare il codice OTP per confermare il consenso`;
+      userAccessCode = codeUpper;
+      const consent = `Per proseguire ho bisogno del tuo consenso al trattamento dei dati.\n\nFinalità e dati trattati:\n1) Invio della canzone generata → uso della tua e-mail.\n2) Invio di OTP via MAIL per confermare la tua identità.\n3) Uso della voce del minore per dialogo con l’assistente virtuale (solo con consenso del genitore/tutore).\n\nBase giuridica: tuo consenso (art. 6 e art. 8 GDPR).\nModalità: dati trattati in modo sicuro e non condivisi con terzi non autorizzati.\nConservazione: solo per il tempo necessario al servizio.\n\nPer acconsentire clicca su "SÌ, ACCONSENTO" in modo da consentirci l'invio del codice OTP per confermare il consenso`;
       renderMessage(consent, "avatar", who);
+      try { showConsentSuggestions(); } catch (_) {}
       gatePhase = "phone";
       waitingForUser = true;
       userInput.value = "";
@@ -873,7 +1095,6 @@ async function handleUserAnswer(text) {
       try { localStorage.setItem("MUSICLAB_OTP", userConsentOTP); } catch (_) {}
       const ok = await sendConsentOtpEmail(userEmail, userConsentOTP);
       if (ok) {
-        renderMessage("Ti abbiamo inviato un codice OTP via e-mail. Inserisci il codice di 6 cifre per confermare il consenso", "avatar", who);
         gatePhase = "otp";
         otpAttempts = 0;
         if (otpTimerId) { try { clearTimeout(otpTimerId); } catch (_) {} otpTimerId = null; }
@@ -884,15 +1105,25 @@ async function handleUserAnswer(text) {
           startCountdown(15);
           setTimeout(() => { try { location.reload(); } catch (_) {} }, 15000);
         }, 60000);
-        waitingForUser = true;
-        userInput.value = "";
-        autoResize();
-        updateSendDisabled();
+        if (otpGate) otpGate.style.display = "grid";
+        if (userInput) userInput.disabled = true;
+        try { otpInput && otpInput.focus(); } catch (_) {}
         return;
       } else {
-        renderMessage("Invio OTP via e-mail non riuscito. Riprova.", "avatar", who);
-        waitingForUser = true;
-        updateSendDisabled();
+        gatePhase = "otp";
+        otpAttempts = 0;
+        if (otpTimerId) { try { clearTimeout(otpTimerId); } catch (_) {} otpTimerId = null; }
+        otpTimerId = setTimeout(() => {
+          renderMessage("Tempo scaduto: il codice OTP è scaduto.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+          waitingForUser = false;
+          updateSendDisabled();
+          startCountdown(15);
+          setTimeout(() => { try { location.reload(); } catch (_) {} }, 15000);
+        }, 60000);
+        if (otpGate) otpGate.style.display = "block";
+        if (otpError) { otpError.textContent = "Invio OTP via e-mail non riuscito. Riprova."; otpError.style.display = "block"; }
+        if (userInput) userInput.disabled = true;
+        try { otpInput && otpInput.focus(); } catch (_) {}
         return;
       }
     }
@@ -955,6 +1186,7 @@ async function handleUserAnswer(text) {
       return;
     }
   }
+  try { clearSuggestions(); } catch (_) {}
   
   answers.push({ numero: currentIndex + 1, categoria: categories[currentIndex], risposta: answerText });
   waitingForUser = false;
@@ -967,6 +1199,424 @@ async function handleUserAnswer(text) {
   } else {
     finishFlow();
   }
+}
+
+function showQuestion1Suggestions() {
+  clearSuggestions();
+  const list = [
+    "Mi piacciono tantissimo i regali!",
+    "Mi piace stare con tutta la famiglia.",
+    "Adoro fare l’albero di Natale.",
+    "Mi piace quando nevica e posso giocare fuori.",
+    "Mi piace il profumo dei biscotti che fa la mamma.",
+    "Mi piacciono le lucine che brillano dappertutto.",
+    "Mi piace sentire le canzoncine di Natale.",
+    "Mi piace lasciare i biscotti per Babbo Natale.",
+    "Mi piace aprire il calendario dell’avvento ogni mattina.",
+    "Mi piace perché tutti sono più felici."
+  ];
+  const cont = document.createElement("div");
+  cont.className = "suggestions";
+  list.forEach((t) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "suggestion-chip";
+    chip.textContent = t;
+    chip.addEventListener("click", () => {
+      userInput.value = t;
+      autoResize();
+      updateSendDisabled();
+      try { userInput.focus(); } catch (_) {}
+    });
+    cont.appendChild(chip);
+  });
+  suggestionsEl = cont;
+  chatEl.appendChild(cont);
+  scrollToBottom();
+}
+
+function clearSuggestions() {
+  if (suggestionsEl && suggestionsEl.parentNode) {
+    try { suggestionsEl.parentNode.removeChild(suggestionsEl); } catch (_) {}
+  }
+  suggestionsEl = null;
+}
+
+function showQuestion2Suggestions() {
+  clearSuggestions();
+  const list = [
+    "Babbo Natale che vola col suo saccone gigante.",
+    "Un elfo piccino che fa pasticci.",
+    "Una renna che sa cantare.",
+    "Un pupazzo di neve che prende vita.",
+    "Una stellina che parla.",
+    "Un orsetto polare che vuole fare amicizia.",
+    "La Befana che sbaglia giorno.",
+    "Un pinguino ballerino.",
+    "Una fata del ghiaccio.",
+    "Io che salvo il Natale!"
+  ];
+  const cont = document.createElement("div");
+  cont.className = "suggestions";
+  list.forEach((t) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "suggestion-chip";
+    chip.textContent = t;
+    chip.addEventListener("click", () => {
+      userInput.value = t;
+      autoResize();
+      updateSendDisabled();
+      try { userInput.focus(); } catch (_) {}
+    });
+    cont.appendChild(chip);
+  });
+  suggestionsEl = cont;
+  chatEl.appendChild(cont);
+  scrollToBottom();
+}
+
+function showQuestion3Suggestions() {
+  clearSuggestions();
+  const list = [
+    "Al Polo Nord, nella fabbrica dei giocattoli.",
+    "Nel bosco tutto illuminato.",
+    "A casa mia, vicino all’albero.",
+    "A scuola con i miei amici.",
+    "Sulla slitta di Babbo Natale.",
+    "Dentro un igloo gigante.",
+    "Su una montagna piena di neve.",
+    "In una città super luminosa.",
+    "Nel cielo, tra le stelle.",
+    "In un villaggio segreto degli elfi."
+  ];
+  const cont = document.createElement("div");
+  cont.className = "suggestions";
+  list.forEach((t) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "suggestion-chip";
+    chip.textContent = t;
+    chip.addEventListener("click", () => {
+      userInput.value = t;
+      autoResize();
+      updateSendDisabled();
+      try { userInput.focus(); } catch (_) {}
+    });
+    cont.appendChild(chip);
+  });
+  suggestionsEl = cont;
+  chatEl.appendChild(cont);
+  scrollToBottom();
+}
+
+function showQuestion4Suggestions() {
+  clearSuggestions();
+  const list = [
+    "Una sorpresa di Natale cambia tutto.",
+    "Il regalo sparisce e lo dobbiamo cercare.",
+    "Babbo Natale si è raffreddato!",
+    "Le renne fanno una gara.",
+    "Le luci dell’albero parlano.",
+    "Tutti iniziano a cantare senza motivo.",
+    "Un bambino aiuta un elfo in difficoltà.",
+    "Una neve magica fa brillare le cose.",
+    "Una festa con biscotti e campanelle.",
+    "Un sogno diventa vero."
+  ];
+  const cont = document.createElement("div");
+  cont.className = "suggestions";
+  list.forEach((t) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "suggestion-chip";
+    chip.textContent = t;
+    chip.addEventListener("click", () => {
+      userInput.value = t;
+      autoResize();
+      updateSendDisabled();
+      try { userInput.focus(); } catch (_) {}
+    });
+    cont.appendChild(chip);
+  });
+  suggestionsEl = cont;
+  chatEl.appendChild(cont);
+  scrollToBottom();
+}
+
+function showQuestion5Suggestions() {
+  clearSuggestions();
+  const list = [
+    "Tanta allegria!",
+    "La magia che fa battere il cuore.",
+    "La sorpresa che ti fa dire ‘Wow!’.",
+    "La tenerezza.",
+    "La felicità di stare insieme.",
+    "La calma della neve che scende.",
+    "L’emozione dell’attesa.",
+    "La voglia di abbracciarsi tutti.",
+    "La sensazione di un desiderio che si avvera.",
+    "Un po’ di mistero!"
+  ];
+  const cont = document.createElement("div");
+  cont.className = "suggestions";
+  list.forEach((t) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "suggestion-chip";
+    chip.textContent = t;
+    chip.addEventListener("click", () => {
+      userInput.value = t;
+      autoResize();
+      updateSendDisabled();
+      try { userInput.focus(); } catch (_) {}
+    });
+    cont.appendChild(chip);
+  });
+  suggestionsEl = cont;
+  chatEl.appendChild(cont);
+  scrollToBottom();
+}
+
+function showQuestion6Suggestions() {
+  clearSuggestions();
+  const list = [
+    "Magia, magia!",
+    "Din don dan!",
+    "Natale è qua!",
+    "Brilla, brilla!",
+    "Yo-ho-ho!",
+    "Tutti insieme!",
+    "Neve che cade!",
+    "Felice Natale!",
+    "Sogna con me!",
+    "Lalalalalà!"
+  ];
+  const cont = document.createElement("div");
+  cont.className = "suggestions";
+  list.forEach((t) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "suggestion-chip";
+    chip.textContent = t;
+    chip.addEventListener("click", () => {
+      userInput.value = t;
+      autoResize();
+      updateSendDisabled();
+      try { userInput.focus(); } catch (_) {}
+    });
+    cont.appendChild(chip);
+  });
+  suggestionsEl = cont;
+  chatEl.appendChild(cont);
+  scrollToBottom();
+}
+
+function showQuestion7Suggestions() {
+  clearSuggestions();
+  const list = [
+    "A essere gentili.",
+    "A condividere.",
+    "Ad aiutare chi è triste.",
+    "A dire grazie.",
+    "A non litigare.",
+    "A credere nei propri sogni.",
+    "A non sprecare nulla.",
+    "A volersi bene.",
+    "A non arrendersi.",
+    "A sorridere di più."
+  ];
+  const cont = document.createElement("div");
+  cont.className = "suggestions";
+  list.forEach((t) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "suggestion-chip";
+    chip.textContent = t;
+    chip.addEventListener("click", () => {
+      userInput.value = t;
+      autoResize();
+      updateSendDisabled();
+      try { userInput.focus(); } catch (_) {}
+    });
+    cont.appendChild(chip);
+  });
+  suggestionsEl = cont;
+  chatEl.appendChild(cont);
+  scrollToBottom();
+}
+
+function showQuestion8Suggestions() {
+  clearSuggestions();
+  const list = [
+    "Veloce da ballare!",
+    "Lenta e dolce.",
+    "Veloce come le renne.",
+    "Lenta come la neve che cade.",
+    "Un po’ veloce e un po’ lenta.",
+    "Così veloce che non sto fermo!",
+    "Piano piano, come una ninna nanna.",
+    "Media, come una passeggiata.",
+    "Veloce come una festa.",
+    "Lenta per ascoltare bene le parole."
+  ];
+  const cont = document.createElement("div");
+  cont.className = "suggestions";
+  list.forEach((t) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "suggestion-chip";
+    chip.textContent = t;
+    chip.addEventListener("click", () => {
+      userInput.value = t;
+      autoResize();
+      updateSendDisabled();
+      try { userInput.focus(); } catch (_) {}
+    });
+    cont.appendChild(chip);
+  });
+  suggestionsEl = cont;
+  chatEl.appendChild(cont);
+  scrollToBottom();
+}
+
+function showQuestion9Suggestions() {
+  clearSuggestions();
+  const list = [
+    "Le campanelle!",
+    "Il pianoforte.",
+    "La chitarra.",
+    "Il violino.",
+    "Il flauto.",
+    "Il tamburello.",
+    "Il sassofono.",
+    "La batteria.",
+    "L’arpa.",
+    "Le percussioni di legno che fanno toc toc!"
+  ];
+  const cont = document.createElement("div");
+  cont.className = "suggestions";
+  list.forEach((t) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "suggestion-chip";
+    chip.textContent = t;
+    chip.addEventListener("click", () => {
+      userInput.value = t;
+      autoResize();
+      updateSendDisabled();
+      try { userInput.focus(); } catch (_) {}
+    });
+    cont.appendChild(chip);
+  });
+  suggestionsEl = cont;
+  chatEl.appendChild(cont);
+  scrollToBottom();
+}
+
+function showConsentSuggestions() {
+  clearSuggestions();
+  const list = [
+    "SÌ, ACCONSENTO",
+    "NON, ACCONSENTO"
+  ];
+  const cont = document.createElement("div");
+  cont.className = "suggestions";
+  list.forEach((t) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "suggestion-chip";
+    chip.textContent = t;
+    chip.addEventListener("click", () => {
+      if (/^NON/i.test(t)) {
+        clearSuggestions();
+        const who = { id: 99, name: "Assistente", initial: "ML" };
+        renderMessage("Non avendo fornito il consenso al trattamento dei dati richiesto, al momento non è possibile proseguire con il servizio", "avatar", who);
+        waitingForUser = false;
+        gatePhase = null;
+        if (userInput) userInput.disabled = true;
+        if (sendBtn) sendBtn.disabled = true;
+        if (speakBtn) speakBtn.disabled = true;
+        startCountdown(15);
+      } else {
+        clearSuggestions();
+        const who = { id: 99, name: "Assistente", initial: "ML" };
+        userConsentOTP = String(Math.floor(Math.random() * 1000000)).padStart(6, "0");
+        try { localStorage.setItem("MUSICLAB_OTP", userConsentOTP); } catch (_) {}
+        (async () => {
+          const ok = await sendConsentOtpEmail(userEmail, userConsentOTP);
+          if (ok) {
+            gatePhase = "otp";
+            otpAttempts = 0;
+            if (otpTimerId) { try { clearTimeout(otpTimerId); } catch (_) {} otpTimerId = null; }
+            otpTimerId = setTimeout(() => {
+              renderMessage("Tempo scaduto: il codice OTP è scaduto.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+              waitingForUser = false;
+              updateSendDisabled();
+              startCountdown(15);
+              setTimeout(() => { try { location.reload(); } catch (_) {} }, 15000);
+            }, 60000);
+            if (otpGate) otpGate.style.display = "grid";
+            if (userInput) userInput.disabled = true;
+            try { otpInput && otpInput.focus(); } catch (_) {}
+          } else {
+            gatePhase = "otp";
+            otpAttempts = 0;
+            if (otpTimerId) { try { clearTimeout(otpTimerId); } catch (_) {} otpTimerId = null; }
+            otpTimerId = setTimeout(() => {
+              renderMessage("Tempo scaduto: il codice OTP è scaduto.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+              waitingForUser = false;
+              updateSendDisabled();
+              startCountdown(15);
+              setTimeout(() => { try { location.reload(); } catch (_) {} }, 15000);
+            }, 60000);
+        if (otpGate) otpGate.style.display = "grid";
+            if (otpError) { otpError.textContent = "Invio OTP via e-mail non riuscito. Riprova."; otpError.style.display = "block"; }
+            if (userInput) userInput.disabled = true;
+            try { otpInput && otpInput.focus(); } catch (_) {}
+          }
+        })();
+      }
+    });
+    cont.appendChild(chip);
+  });
+  suggestionsEl = cont;
+  chatEl.appendChild(cont);
+  scrollToBottom();
+}
+
+function showQuestion10Suggestions() {
+  clearSuggestions();
+  const list = [
+    "Pop, così è allegra.",
+    "Filastrocca, per cantare tutti insieme.",
+    "Classica, come nei film di Natale.",
+    "Rock leggero, perché è divertente.",
+    "Swing, così si balla!",
+    "Musica natalizia tradizionale.",
+    "Pop con un po’ di magia.",
+    "Filastrocca molto ritmata.",
+    "Classica con le campanelle.",
+    "Rock ma morbido morbido."
+  ];
+  const cont = document.createElement("div");
+  cont.className = "suggestions";
+  list.forEach((t) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "suggestion-chip";
+    chip.textContent = t;
+    chip.addEventListener("click", () => {
+      userInput.value = t;
+      autoResize();
+      updateSendDisabled();
+      try { userInput.focus(); } catch (_) {}
+    });
+    cont.appendChild(chip);
+  });
+  suggestionsEl = cont;
+  chatEl.appendChild(cont);
+  scrollToBottom();
 }
 
 function handleSubmit(e) {
@@ -1010,6 +1660,30 @@ function autoResize() {
   userInput.style.height = h + "px";
 }
 userInput.addEventListener("input", autoResize);
+
+function showKeyboardFor(el) {
+  try {
+    el.setAttribute("autocapitalize", "none");
+    el.setAttribute("enterkeyhint", "done");
+    el.focus({ preventScroll: false });
+    try {
+      const len = (el.value || "").length;
+      if (typeof el.setSelectionRange === "function") {
+        el.setSelectionRange(len, len);
+      }
+    } catch (_) {}
+    try { el.click(); } catch (_) {}
+    try {
+      if (navigator.virtualKeyboard && typeof navigator.virtualKeyboard.show === "function") {
+        navigator.virtualKeyboard.show();
+      }
+    } catch (_) {}
+    try { el.scrollIntoView({ block: "end" }); } catch (_) {}
+    setTimeout(() => {
+      try { el.focus(); } catch (_) {}
+    }, 60);
+  } catch (_) {}
+}
 
 function tryUnmuteAvatar() {
   if (!avatarVideo) return;
@@ -1108,18 +1782,146 @@ window.addEventListener("DOMContentLoaded", () => {
   showTyping(true);
   setTimeout(() => {
     showTyping(false);
-    renderMessage("Per iniziare, inserisci il tuo indirizzo email", "avatar", { id: 99, name: "Assistente", initial: "ML" });
-    waitingForUser = true;
+    waitingForUser = false;
     gatePhase = "email";
     userInput.disabled = false;
+    if (speakBtn) {
+      speakBtn.disabled = true;
+      speakBtn.classList.remove("recording");
+    }
+    if (speakHint) speakHint.style.display = "none";
+    try {
+      userInput.setAttribute("inputmode", "email");
+      userInput.setAttribute("autocomplete", "email");
+      userInput.placeholder = "Inserisci la tua email…";
+    } catch (_) {}
     forceEnableSend = false;
     updateSendDisabled();
     autoResize();
-  userInput.focus();
+  if (emailGate) emailGate.style.display = "block";
+  if (emailInput) {
+    emailInput.setAttribute("inputmode", "email");
+    emailInput.setAttribute("autocomplete", "email");
+    emailInput.focus();
+    try { emailInput.setSelectionRange((emailInput.value || "").length, (emailInput.value || "").length); } catch (_) {}
+  }
   }, 600);
   if (uploadCodiciBtn) {
     uploadCodiciBtn.addEventListener("click", () => {
       uploadCodiciAppToBucket();
+    });
+  }
+  if (emailConfirmBtn && emailInput && emailCodeInput) {
+    const submitGate = async () => {
+      const vEmail = String(emailInput.value || "").trim();
+      const vCode = String(emailCodeInput.value || "").trim();
+      const vEmailU = vEmail.toUpperCase();
+      const vCodeU = vCode.toUpperCase();
+      const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!vEmail || !re.test(vEmail)) {
+        if (emailError) emailError.textContent = "Inserisci un indirizzo email valido";
+        if (emailError) emailError.style.display = "block";
+        try { emailInput.focus(); } catch (_) {}
+        return;
+      }
+      if (!vCode || vCode.length < 4) {
+        if (emailError) emailError.textContent = "Inserisci un codice di accesso valido";
+        if (emailError) emailError.style.display = "block";
+        try { emailCodeInput.focus(); } catch (_) {}
+        return;
+      }
+      if (emailError) emailError.style.display = "none";
+      const res = await verifyAppCode(vCodeU);
+      if (!res.found) {
+        if (emailError) emailError.textContent = "Codice App non valido";
+        if (emailError) emailError.style.display = "block";
+        try { emailCodeInput.focus(); } catch (_) {}
+        return;
+      }
+      if (res.used) {
+        if (emailError) emailError.textContent = "Codice App già utilizzato";
+        if (emailError) emailError.style.display = "block";
+        try { emailCodeInput.focus(); } catch (_) {}
+        return;
+      }
+      userEmail = vEmailU;
+      userAccessCode = vCodeU;
+      if (emailGate) emailGate.style.display = "none";
+      if (speakBtn) speakBtn.disabled = false;
+      gatePhase = "phone";
+      waitingForUser = true;
+      userInput.disabled = false;
+      userInput.value = "";
+      updateSendDisabled();
+      autoResize();
+      const who = { id: 99, name: "Assistente", initial: "ML" };      
+      const consent = `Per proseguire ho bisogno del tuo consenso al trattamento dei dati.\n\nFinalità e dati trattati:\n1) Invio della canzone generata → uso della tua e-mail.\n2) Invio di OTP via MAIL per confermare la tua identità.\n3) Uso della voce del minore per dialogo con l’assistente virtuale (solo con consenso del genitore/tutore).\n\nBase giuridica: tuo consenso (art. 6 e art. 8 GDPR).\nModalità: dati trattati in modo sicuro e non condivisi con terzi non autorizzati.\nConservazione: solo per il tempo necessario al servizio.\n\nPer acconsentire clicca su "SÌ, ACCONSENTO" in modo da consentirci l'invio del codice OTP per confermare il consenso`;
+      renderMessage(consent, "avatar", who);
+      try { showConsentSuggestions(); } catch (_) {}
+      try { userInput.focus(); } catch (_) {}
+    };
+    emailConfirmBtn.addEventListener("click", submitGate);
+    emailInput.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        submitGate();
+      }
+    });
+    emailCodeInput.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        submitGate();
+      }
+    });
+  }
+  if (otpConfirmBtn && otpInput) {
+    const submitOtpGate = async () => {
+      const onlyDigits = String(otpInput.value || "").replace(/\D/g, "");
+      if (!/^\d{6}$/.test(onlyDigits)) {
+        if (otpError) otpError.textContent = "Inserisci un codice OTP valido (6 cifre)";
+        if (otpError) otpError.style.display = "block";
+        try { otpInput.focus(); } catch (_) {}
+        return;
+      }
+      if (userConsentOTP && onlyDigits !== userConsentOTP) {
+        otpAttempts += 1;
+        if (otpAttempts >= 4) {
+          if (otpError) otpError.textContent = "Troppi tentativi: ricarico la pagina";
+          if (otpError) otpError.style.display = "block";
+          if (otpTimerId) { try { clearTimeout(otpTimerId); } catch (_) {} otpTimerId = null; }
+          startCountdown(15);
+          setTimeout(() => { try { location.reload(); } catch (_) {} }, 15000);
+          return;
+        }
+        if (otpError) otpError.textContent = "Codice OTP errato. Riprova.";
+        if (otpError) otpError.style.display = "block";
+        try { otpInput.focus(); } catch (_) {}
+        return;
+      }
+      if (otpTimerId) { try { clearTimeout(otpTimerId); } catch (_) {} otpTimerId = null; }
+      otpVerifiedAt = new Date().toISOString();
+      try {
+        const updated = await markAppCodeUsed(userAccessCode, userEmail, otpVerifiedAt, "Y", userConsentOTP);
+        if (!updated) {
+          renderMessage("Aggiornamento remoto del Codice App non riuscito. Riprova più tardi.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+        }
+      } catch (_) {
+        renderMessage("Aggiornamento remoto del Codice App non riuscito. Riprova più tardi.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      }
+      if (otpGate) otpGate.style.display = "none";
+      gatePhase = null;
+      waitingForUser = false;
+      userInput.value = "";
+      userInput.disabled = true;
+      autoResize();
+      playAssistantLines(introLines, showFirstQuestionAfterIntro);
+    };
+    otpConfirmBtn.addEventListener("click", submitOtpGate);
+    otpInput.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        submitOtpGate();
+      }
     });
   }
 });

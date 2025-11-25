@@ -51,8 +51,9 @@
       <div id="emailGate" class="email-gate" role="dialog" aria-modal="true" aria-label="Email richiesta" style="display:none">
         <div class="email-card">
           <div class="email-hero">
-            <img src="LogoApp.png" alt="Logo" class="email-logo" />
-            <div class="email-badge">Curno AI Christmas Sound</div>
+            <img src="LogoApp.png" alt="Logo" class="banner-logo" />
+            <p></p>
+            <!--<div class="email-badge">Curno AI Christmas Sound</div>-->
           </div>
           <h2 class="email-title">Pronti a creare la TUA canzone?</h2>
           <p class="email-desc">Inserisci email e codice per iniziare.</p>
@@ -62,6 +63,18 @@
           </div>
           <button id="emailConfirmBtn" class="email-btn" type="button">Conferma</button>
           <span id="emailError" class="email-error" aria-live="polite" style="display:none"></span>
+        </div>
+      </div>
+
+      <div id="otpGate" class="email-gate" role="dialog" aria-modal="true" aria-label="OTP richiesta" style="display:none">
+        <div class="email-card">
+          <h2 class="email-title">Conferma il consenso</h2>
+          <p class="email-desc">Inserisci il codice OTP di 6 cifre che ti abbiamo inviato via e-mail.</p>
+          <div class="email-fields">
+            <input id="otpInput" class="email-input icon-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Codice OTP (6 cifre)" aria-label="Codice OTP" />
+          </div>
+          <button id="otpConfirmBtn" class="email-btn" type="button">Conferma</button>
+          <span id="otpError" class="email-error" aria-live="polite" style="display:none"></span>
         </div>
       </div>
 
