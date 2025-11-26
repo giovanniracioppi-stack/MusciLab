@@ -280,6 +280,13 @@ function updateHeaderAvatar(av) {
 
   // Prova a caricare e riprodurre il video
   if (avatarVideo) {
+    try {
+      avatarVideo.pause();
+    } catch (_) {}
+    try {
+      avatarVideo.removeAttribute("src");
+      avatarVideo.load();
+    } catch (_) {}
     // Precarica sempre il video per evitare blocchi all'avvio
     avatarVideo.src = av.video;
     avatarVideo.preload = "auto";
@@ -290,7 +297,7 @@ function updateHeaderAvatar(av) {
       if (avatarImage) avatarImage.src = "avatar.png";
     } else {
       if (avatarImageContainer) avatarImageContainer.classList.add("is-hidden");
-      if (avatarVideoContainer) avatarVideoContainer.classList.remove("is-hidden");
+      if (avatarVideoContainer) avatarVideoContainer.classList.add("is-hidden");
       avatarCircle.style.display = "none";
       avatarVideo.currentTime = 0;
       avatarVideo.loop = false;
@@ -313,6 +320,7 @@ function updateHeaderAvatar(av) {
 
     const canplayHandler = () => {
       showVideo();
+      try { avatarVideo.currentTime = 0; } catch (_) {}
       avatarVideo.play().catch(() => {});
     };
     avatarVideo.addEventListener("canplaythrough", canplayHandler, { once: true });
