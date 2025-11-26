@@ -6,27 +6,41 @@ const palette = {
   sky: "#5bc4ff",
 };
 
-// Definizione dei 10 step con le domande natalizie
-const avatars = Array.from({ length: 10 }, (_, i) => {
+const BASE_QUESTIONS = [
+  `🎄 Che cosa ti piace di più del Natale?`,
+  `💫 Vuoi che nella canzone ci sia un personaggio speciale? Babbo Natale, un elfo, un animale, o proprio tu…?`,
+  `🎸 Dove si svolge la storia della tua canzone (nel bosco, a casa, al Polo Nord, a scuola…)?`,
+  `🎵 Che cosa succede nella canzone? Mi racconti un momento speciale.`,
+  `📜 Quali emozioni vuoi trasmettere? Che ne dici di allegria? O magari sorpresa? Meglio magia?`,
+  `🗣️ C’è una frase o una parola che ti piacerebbe ripetere nel ritornello?`,
+  `🪄 Vuoi che la canzone insegni qualcosa? Ad esempio, essere gentili, condividere, aiutare gli altri?`,
+  `🔔 Preferisci una musica veloce o lenta?`,
+  `🌟 Quali strumenti ti piacciono di più per una canzone di Natale?`,
+  `🎁 Che tipo di musica preferisci tra: pop, filastrocca, classica, rock leggero, swing, o infine natalizia tradizionale?`
+];
+const MUSICLAB_QUESTIONS_ORDER = [1,2,6,8,9,10];
+function _parseOrder(s) {
+  let arr;
+  if (Array.isArray(s)) arr = s;
+  else arr = String(s || "").split(/[\s,;]+/).map(x => parseInt(x, 10));
+  arr = (arr || []).filter(n => Number.isFinite(n) && n >= 1 && n <= 10);
+  const seen = new Set();
+  const out = [];
+  for (const n of arr) { if (!seen.has(n)) { seen.add(n); out.push(n); } }
+  return out;
+}
+const _defaultOrder = Array.from({ length: BASE_QUESTIONS.length }, (_, i) => i + 1);
+const QUESTIONS_ORDER = _parseOrder(MUSICLAB_QUESTIONS_ORDER) || _defaultOrder;
+const avatars = Array.from({ length: QUESTIONS_ORDER.length }, (_, i) => {
   const id = i + 1;
-  const questions = [
-    `🎄 1. Che cosa ti piace di più del Natale?`,
-    `💫 2. Vuoi che nella canzone ci sia un personaggio speciale? Babbo Natale, un elfo, un animale, o proprio tu…?`,
-    `🎸 3. Dove si svolge la storia della tua canzone (nel bosco, a casa, al Polo Nord, a scuola…)?`,
-    `🎵 4. Che cosa succede nella canzone? Mi racconti un momento speciale.`,
-    `📜 5. Quali emozioni vuoi trasmettere? Che ne dici di allegria? O magari sorpresa? Meglio magia?`,
-    `🗣️ 6. C’è una frase o una parola che ti piacerebbe ripetere nel ritornello?`,
-    `🪄 7. Vuoi che la canzone insegni qualcosa? Ad esempio, essere gentili, condividere, aiutare gli altri?`,
-    `🔔 8. Preferisci una musica veloce o lenta?`,
-    `🌟 9. Quali strumenti ti piacciono di più per una canzone di Natale?`,
-    `🎁 10. Che tipo di musica preferisci tra: pop, filastrocca, classica, rock leggero, swing, o infine natalizia tradizionale?`
-  ];
+  const baseId = QUESTIONS_ORDER[i];
   return {
     id,
     name: "DoReMilla",
     initial: "DM",
     video: `Avatar_${id}.mp4`,
-    question: questions[i]
+    question: BASE_QUESTIONS[baseId - 1],
+    baseId: baseId
   };
 });
 
@@ -36,18 +50,19 @@ const answers = [];
 let otpAttempts = 0;
 let otpTimerId = null;
 let otpVerifiedAt = null;
-const categories = [
-  "Storia delle canzone",
-  "Emozione della canzone",
-  "Stile musicale",
-  "Ritmo della canzone",
-  "Struttura della canzone",
-  "Protagonista della canzone",
-  "Testo",
-  "Strumenti musicale",
+const BASE_CATEGORIES = [
   "Ispirazione",
-  "Messaggio della canzone",
+  "Protagonista",
+  "Ambientazione",
+  "Evento",
+  "Emozione",
+  "Frase/Ritornello",
+  "Messaggio",
+  "Ritmo",
+  "Strumenti",
+  "Stile",
 ];
+const FLOW_CATEGORIES = QUESTIONS_ORDER.map(id => BASE_CATEGORIES[id - 1]);
 
 // Riferimenti DOM
 const messagesEl = document.getElementById("messages");
@@ -92,6 +107,35 @@ let gatePhase = null;
 let avatarAudioEnabled = false;
 let avatarVideoAllowed = false;
 let suggestionsEl = null;
+function escapeRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+const FORBIDDEN_WORDS = [
+  "cazzo","cazzata","incazzato","merda","merdoso","stronzo","stronza","stronzata","vaffanculo","fanculo","coglione","coglioni","palle","rottura di palle","bastardo","bastarda","puttana","troia","zoccola","mignotta","bagascia","baldracca","scrofa","vacca","figlio di puttana","fottiti","fottere","fottuto","porca","porco","madonna","dio","cristo","gesù","santo","mannaggia","cacchio","cavolo","culo","culone","chiappe","sedere","pisciare","cagare","piscia","cacca","puzzone",
+  "uccidere","ucciso","ammazzare","ammazzato","omicidio","assassinio","assassino","morte","morto","morire","cadavere","salma","seppellire","tomba","funerale","bara","cimitero","sangue","sanguinare","dissanguato","ferita","ferito","taglio","squartare","mutilare","picchiare","botte","pugni","schiaffi","calci","rissa","violenza","tortura","soffrire","dolore","agonia","suicidio","suicidarsi","impiccato","veleno","avvelenato","pistola","fucile","arma","armi","coltello","pugnale","lama","spada","bomba","esplosione","granata","missile","guerra","battaglia","soldato","terrorista","terrorismo","attentato","strage","massacro","genocidio","sparare","sparatoria",
+  "sesso","sessuale","fare l'amore","scopare","chiavare","trombare","pene","pisello","vagina","patata","fica","figa","seno","tette","capezzoli","nudo","nuda","nudità","spogliarsi","intimo","mutande","reggiseno","orgasmo","godere","eiaculare","sperma","preservativo","contraccettivo","vergine","verginita","prostituta","prostituzione","pimp","maniaco","pedofilo","stupro","violentare","abuso","molestia","porno","pornografia","hard","erotico","eccitante","arrapato","rapimento",
+  "droga","drogarsi","drogato","tossico","tossicodipendente","spacciatore","cocaina","coca","eroina","marijuana","maria","erba","hashish","canna","spinello","fumare","fumo","sigaretta","sigaro","tabacco","nicotina","svapare","alcol","alcolico","ubriaco","sbronzo","brillo","vino","birra","vodka","whisky","liquore","grappa","barcollare","vomitare","overdose","siringa","ago","pasticca","anfetamina",
+  "stupido","scemo","cretino","imbecille","idiota","ritardato","handicappato","mongoloide","spastico","down","pazzo","matto","folle","schifoso","brutto","ciccione","grasso","obeso","anoressico","nano","storipio","negro","nigger","sporco","ladro","zingaro","rom","ebreo","frocio","finocchio","ricchione","gay","lesbica","trans","travestito",
+  "diavolo","demone","satana","lucifero","inferno","dannato","maledetto","maledizione","stregoneria","vudù","zombie","vampiro","lupo mannaro","fantasma","spettro","mostro","incubo","paura","terrore","buio","rapire","rubare","ladro","prigione","galera","carcere","polizia"
+];
+function shouldFilterNow() { return !gatePhase; }
+function sanitizeForbidden(text) {
+  if (!shouldFilterNow()) return text;
+  let out = text || "";
+  for (const w of FORBIDDEN_WORDS) {
+    const re = new RegExp("\\b" + escapeRegExp(w) + "\\b", "gi");
+    out = out.replace(re, "");
+  }
+  out = out.replace(/\s{2,}/g, " ").trim();
+  return out;
+}
+function containsForbidden(text) {
+  if (!shouldFilterNow()) return false;
+  const t = text || "";
+  for (const w of FORBIDDEN_WORDS) {
+    const re = new RegExp("\\b" + escapeRegExp(w) + "\\b", "i");
+    if (re.test(t)) return true;
+  }
+  return false;
+}
 const introLines = [
   "Ehi tu! 🎁\nSì, proprio tu che ami il Natale! ✨\nHai mai pensato… di creare la tua canzone di Natale?\nUna canzone tutta tua, piena di emozioni, suoni e magia? 🎶\nBene! Oggi diventi tu il compositore del Natale! 😍\nIo ti farò dieci domande super speciali… e con le tue risposte, creeremo insieme la canzone più magica dell’anno!\nPronto? 3… 2… 1… via! 🌟"
 ];
@@ -133,7 +177,10 @@ if (SpeechRec) {
       }
     }
     recognitionBuffer += finalText;
-    userInput.value = (recognitionBuffer + interimText).trim();
+    const combined = (recognitionBuffer + interimText).trim();
+    const cleaned = sanitizeForbidden(combined);
+    recognitionBuffer = cleaned;
+    userInput.value = cleaned;
     autoResize();
     updateSendDisabled();
   };
@@ -411,27 +458,22 @@ function showNextQuestion() {
     if (speakBtn) speakBtn.disabled = true;
     forceEnableSend = false;
     updateSendDisabled();
-    if (currentIndex === 0) {
-      try { showQuestion1Suggestions(); } catch (_) {}
-    } else if (currentIndex === 1) {
-      try { showQuestion2Suggestions(); } catch (_) {}
-    } else if (currentIndex === 2) {
-      try { showQuestion3Suggestions(); } catch (_) {}
-    } else if (currentIndex === 3) {
-      try { showQuestion4Suggestions(); } catch (_) {}
-    } else if (currentIndex === 4) {
-      try { showQuestion5Suggestions(); } catch (_) {}
-    } else if (currentIndex === 5) {
-      try { showQuestion6Suggestions(); } catch (_) {}
-    } else if (currentIndex === 6) {
-      try { showQuestion7Suggestions(); } catch (_) {}
-    } else if (currentIndex === 7) {
-      try { showQuestion8Suggestions(); } catch (_) {}
-    } else if (currentIndex === 8) {
-      try { showQuestion9Suggestions(); } catch (_) {}
-    } else if (currentIndex === 9) {
-      try { showQuestion10Suggestions(); } catch (_) {}
-    }
+    try {
+      const map = {
+        1: showQuestion1Suggestions,
+        2: showQuestion2Suggestions,
+        3: showQuestion3Suggestions,
+        4: showQuestion4Suggestions,
+        5: showQuestion5Suggestions,
+        6: showQuestion6Suggestions,
+        7: showQuestion7Suggestions,
+        8: showQuestion8Suggestions,
+        9: showQuestion9Suggestions,
+        10: showQuestion10Suggestions,
+      };
+      const fn = map[av.baseId];
+      if (typeof fn === "function") fn();
+    } catch (_) {}
     gateAnswerUntilVideoEnds();
   }, 600);
 }
@@ -454,18 +496,7 @@ function finishFlow() {
     const item = answers.find(a => a.numero === n);
     return item ? item.risposta : "";
   };
-  const cats = [
-    "Storia della canzone",
-    "Emozione principale",
-    "Stile musicale",
-    "Ritmo della canzone",
-    "Struttura della canzone",
-    "Protagonista della canzone",
-    "Parole da inserire nel esto della canzone",
-    "Strumenti musicali predominanti",
-    "Ispirazione",
-    "Messaggio della canzone",
-  ];
+  const cats = FLOW_CATEGORIES.slice();
   const getQ = (n) => {
     const av = avatars[n - 1];
     return av ? av.question : "";
@@ -498,7 +529,7 @@ function finishFlow() {
     .then((text) => {
       showTyping(false);
       const out = text && text.trim().length > 0 ? text.trim() : "Generazione vuota.";
-      renderMessage("Creo anche l'audio della canzone e ti invio il link via email", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      renderMessage("Gli elfi musichieri stanno componendo la base musicale della tua canzone.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
       createSongAndEmail(out);
     })
     .catch((e) => {
@@ -543,7 +574,7 @@ function buildProducerCreatePayload(lyricsText) {
   const a8 = getAns(8);
   const a9 = getAns(9);
   const a10 = getAns(10);
-  const sound = [a7, a8, a9, a10].map(s => String(s || "").trim()).filter(Boolean).join(", ");
+  const sound = ["joyful, emotional that transmits Christmas emotions suitable for children",  a8, a9, a10].map(s => String(s || "").trim()).filter(Boolean).join(", ");
   return {
     task_type: "create_music",
     mv,
@@ -590,11 +621,12 @@ async function createSongAndEmail(lyricsText) {
       await notifyEmailWithSong("MusicLab — Testo canzone", lyricsText, "");
       return;
     }
-    renderMessage("Attendo che l'audio sia pronto…", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+    renderMessage("Un pò di pazienza la tua canzone sta per essere incisa…", "avatar", { id: 99, name: "Assistente", initial: "ML" });
     const url = await pollProducerTask(taskId);
     if (url) {
-      renderMessage(url, "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      const appCode = userAccessCode;
       await notifyEmailWithSong("MusicLab — Link per il download", lyricsText, url);
+      await appendCanzoniLog(appCode, taskId, url);
       if (String(localStorage.getItem("AIMUSIC_AUTODOWNLOAD") || "false") === "true") {
         await autoDownloadSong(url);
       }
@@ -685,6 +717,21 @@ function findAudioUrl(o) {
     }
   }
   return "";
+}
+
+async function appendCanzoniLog(appCode, taskId, url) {
+  const { backendUrl } = await loadSecrets();
+  if (!backendUrl) return false;
+  try {
+    const u = backendUrl.endsWith("/") ? backendUrl + "append-canzoni-log" : backendUrl + "/append-canzoni-log";
+    const r = await fetch(u, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ app_code: appCode, task_id: taskId, url }),
+    });
+    if (r.ok) return true;
+  } catch (_) {}
+  return false;
 }
 
 function sanitizeUrl(s) {
@@ -827,8 +874,7 @@ async function notifyEmailWithSong(subject, songText, songUrl) {
                    `<div>Consenso informato dato in data: ${otpVerifiedAt || "-"}, tramite codice otp inviato a ${userEmail || "-"}</div>` +
                    `<div>Generazione avvenuta con codica attivazione: ${userAccessCode || "-"}</div>` +
                    (songUrl ? `<div>Link download canzone: <a href="${songUrl}" target="_blank" rel="noopener">${songUrl}</a></div>` : "") +
-                   (codiciUrl ? `<div>Link download CodiciAPP: <a href="${codiciUrl}" target="_blank" rel="noopener">${codiciUrl}</a></div>` : "") +
-                   (codiciErr ? `<div>Errore pubblicazione CodiciAPP: ${codiciErr}</div>` : "");
+                   (codiciUrl ? `<div>Link download CodiciAPP: <a href="${codiciUrl}" target="_blank" rel="noopener">${codiciUrl}</a></div>` : "");
   const recipients = [userEmail, "eventi.centrocommercialecurno@hyperlabs.it"].filter(Boolean);
   const remote = backendUrl.endsWith("/") ? backendUrl + "send-email" : backendUrl + "/send-email";
   let done = false;
@@ -1017,9 +1063,15 @@ function publishErrorMessage(code, detail, status) {
  
 
 async function handleUserAnswer(text) {
-  
-  const answerText = (text ?? "").trim();
-  if (!answerText) return;
+  const raw = (text ?? "").trim();
+  const cleaned = sanitizeForbidden(raw);
+  if (!cleaned) {
+    renderMessage("Testo non valido. Evita parole non consentite.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+    waitingForUser = true;
+    updateSendDisabled();
+    return;
+  }
+  const answerText = cleaned;
   renderMessage(answerText, "user");
   if (gatePhase) {
     const who = { id: 99, name: "Assistente", initial: "ML" };
@@ -1058,13 +1110,13 @@ async function handleUserAnswer(text) {
       const codeUpper = String(answerText || "").trim().toUpperCase();
       const codeOk = await verifyAppCode(codeUpper);
       if (!codeOk.found) {
-        renderMessage("Codice App non valido", "avatar", who);
+        renderMessage("Voucher non valido", "avatar", who);
         waitingForUser = true;
         updateSendDisabled();
         return;
       }
       if (codeOk.used) {
-        renderMessage("Codice App già utilizzato", "avatar", who);
+        renderMessage("Voucher già utilizzato", "avatar", who);
         waitingForUser = true;
         updateSendDisabled();
         return;
@@ -1155,10 +1207,10 @@ async function handleUserAnswer(text) {
       try {
         const updated = await markAppCodeUsed(userAccessCode, userEmail, otpVerifiedAt, "Y", userConsentOTP);
         if (!updated) {
-          renderMessage("Aggiornamento remoto del Codice App non riuscito. Riprova più tardi.", "avatar", who);
+          renderMessage("Aggiornamento remoto del Voucher non riuscito. Riprova più tardi.", "avatar", who);
         }
       } catch (_) {
-        renderMessage("Aggiornamento remoto del Codice App non riuscito. Riprova più tardi.", "avatar", who);
+        renderMessage("Aggiornamento remoto del Voucher non riuscito. Riprova più tardi.", "avatar", who);
       }
       let codiciUrl = "";
       let codiciErr = "";
@@ -1188,7 +1240,7 @@ async function handleUserAnswer(text) {
   }
   try { clearSuggestions(); } catch (_) {}
   
-  answers.push({ numero: currentIndex + 1, categoria: categories[currentIndex], risposta: answerText });
+  answers.push({ numero: currentIndex + 1, categoria: FLOW_CATEGORIES[currentIndex], risposta: answerText });
   waitingForUser = false;
   userInput.value = "";
   autoResize();
@@ -1204,20 +1256,61 @@ async function handleUserAnswer(text) {
 function showQuestion1Suggestions() {
   clearSuggestions();
   const list = [
-    "Mi piacciono tantissimo i regali!",
-    "Mi piace stare con tutta la famiglia.",
-    "Adoro fare l’albero di Natale.",
-    "Mi piace quando nevica e posso giocare fuori.",
-    "Mi piace il profumo dei biscotti che fa la mamma.",
-    "Mi piacciono le lucine che brillano dappertutto.",
-    "Mi piace sentire le canzoncine di Natale.",
-    "Mi piace lasciare i biscotti per Babbo Natale.",
-    "Mi piace aprire il calendario dell’avvento ogni mattina.",
-    "Mi piace perché tutti sono più felici."
+"Le lucine che brillano ovunque.",
+"L’odore dei biscotti appena sfornati.",
+"I regali colorati sotto l’albero.",
+"L’abbraccio caldo della famiglia.",
+"La magia che c’è nell’aria.",
+"La neve che cade lenta.",
+"Il presepe pieno di personaggi.",
+"Le canzoni natalizie in ogni stanza.",
+"Il camino acceso.",
+"L’albero decorato con fantasia.",
+"Il tempo passato con gli amici.",
+"Le storie che si raccontano la sera.",
+"Le palline che luccicano.",
+"Il profumo dell’arancia e della cannella.",
+"La sorpresa dei regali nascosti.",
+"Le risate a tavola.",
+"Le cartoline fatte a mano.",
+"Il cioccolato caldo fumante.",
+"La gioia di aspettare la mezzanotte.",
+"Le strade addobbate.",
+"I pupazzi di neve.",
+"I maglioni buffi.",
+"I canti in coro.",
+"I sogni più belli che sembrano veri.",
+"Le luci che si accendono e spengono.",
+"I fiocchi che scendono dal cielo.",
+"I pranzi lunghissimi.",
+"I pacchetti luccicanti.",
+"Le sorprese dietro ogni porta.",
+"Le stelline scintillanti.",
+"I giochi da tavolo in famiglia.",
+"Le foto sotto l’albero.",
+"I dolci tipici del periodo.",
+"Il calore della casa.",
+"Il silenzio della neve di notte.",
+"I canti dei bambini.",
+"I centrotavola fatti a mano.",
+"Le porte decorate.",
+"Le lanterne accese.",
+"Gli auguri sinceri.",
+"Le fiabe natalizie.",
+"L’attesa del mattino.",
+"Le risate dei più piccoli.",
+"Le calze appese al camino.",
+"Il countdown festoso.",
+"L’allegria che contamina tutti.",
+"Le impronte sulla neve fresca.",
+"Le lucine che fanno atmosfera.",
+"Le tradizioni di famiglia.",
+"Il cuore che si scalda."
   ];
+  const subset = randomSample(list, 10);
   const cont = document.createElement("div");
   cont.className = "suggestions";
-  list.forEach((t) => {
+  subset.forEach((t) => {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "suggestion-chip";
@@ -1242,23 +1335,94 @@ function clearSuggestions() {
   suggestionsEl = null;
 }
 
+function shuffleSecure(arr) {
+  const a = arr.slice();
+  const n = a.length;
+  try {
+    const buf = new Uint32Array(n);
+    crypto.getRandomValues(buf);
+    for (let i = n - 1; i > 0; i--) {
+      const j = buf[i] % (i + 1);
+      const t = a[i];
+      a[i] = a[j];
+      a[j] = t;
+    }
+    return a;
+  } catch (_) {
+    for (let i = n - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = a[i];
+      a[i] = a[j];
+      a[j] = t;
+    }
+    return a;
+  }
+}
+
+function randomSample(list, k) {
+  const s = shuffleSecure(list);
+  const m = Math.min(k, s.length);
+  return s.slice(0, m);
+}
+
 function showQuestion2Suggestions() {
   clearSuggestions();
   const list = [
-    "Babbo Natale che vola col suo saccone gigante.",
-    "Un elfo piccino che fa pasticci.",
-    "Una renna che sa cantare.",
-    "Un pupazzo di neve che prende vita.",
-    "Una stellina che parla.",
-    "Un orsetto polare che vuole fare amicizia.",
-    "La Befana che sbaglia giorno.",
-    "Un pinguino ballerino.",
-    "Una fata del ghiaccio.",
-    "Io che salvo il Natale!"
+"Babbo Natale.",
+"Una renna super veloce.",
+"Un elfo pasticcione.",
+"Un pupazzo di neve parlante.",
+"Una stella magica.",
+"Un pinguino danzante.",
+"Una bambina sognatrice.",
+"Un orsetto polare curioso.",
+"Un gatto natalizio.",
+"Un cane travestito da renna.",
+"Un piccolo folletto.",
+"La Befana gentile.",
+"Un albero che sa cantare.",
+"Un orologio che segna la magia.",
+"La neve che parla.",
+"Un biscotto vivente.",
+"Un giocattolo animato.",
+"Un angioletto luminoso.",
+"Un trenino dei sogni.",
+"Una campanella che vola.",
+"Un elfo inventore.",
+"Una renna che racconta storie.",
+"Una fiammella che non si spegne.",
+"Un pupazzo robotico.",
+"Un sacco di regali parlante.",
+"Una cometa birichina.",
+"Un coro di fiocchi di neve.",
+"Un maglione vivace.",
+"Un topolino natalizio.",
+"Un gufetto saggio.",
+"Un lupo buono.",
+"Un bimbo curioso.",
+"Una fata dei doni.",
+"Un regalo misterioso.",
+"Un cavallino a dondolo animato.",
+"Un elfo dormiglione.",
+"Una renna che vuole volare.",
+"Un bambino che incontra la magia.",
+"Una scatola musicale incantata.",
+"Un fiocco gigante.",
+"Un omino di pan di zenzero.",
+"Un trenino di zucchero.",
+"Un coro di stelle.",
+"Un pupazzo che vuole un amico.",
+"Una pallina di Natale chiacchierona.",
+"Una lanterna con una voce dolce.",
+"Una renna rockettara.",
+"Un elfo poeta.",
+"Un orsetto che cerca la neve.",
+"Una renna timida che diventa coraggiosa."
   ];
+  const subset = randomSample(list, 10);
   const cont = document.createElement("div");
   cont.className = "suggestions";
-  list.forEach((t) => {
+  subset.forEach((t) => {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "suggestion-chip";
@@ -1279,20 +1443,61 @@ function showQuestion2Suggestions() {
 function showQuestion3Suggestions() {
   clearSuggestions();
   const list = [
-    "Al Polo Nord, nella fabbrica dei giocattoli.",
-    "Nel bosco tutto illuminato.",
-    "A casa mia, vicino all’albero.",
-    "A scuola con i miei amici.",
-    "Sulla slitta di Babbo Natale.",
-    "Dentro un igloo gigante.",
-    "Su una montagna piena di neve.",
-    "In una città super luminosa.",
-    "Nel cielo, tra le stelle.",
-    "In un villaggio segreto degli elfi."
+"Al Polo Nord.",
+"In un bosco innevato.",
+"In una casa calda e accogliente.",
+"A scuola prima delle vacanze.",
+"In città tra le luci.",
+"In un piccolo villaggio.",
+"Su una montagna innevata.",
+"In una grotta di ghiaccio.",
+"Sulla slitta di Babbo Natale.",
+"In una cucina profumata.",
+"Nel laboratorio degli elfi.",
+"In un negozio di giocattoli.",
+"In un castello di neve.",
+"In una baita di montagna.",
+"In un giardino ghiacciato.",
+"In una piazza piena di canti.",
+"In una soffitta piena di ricordi.",
+"Sulla luna illuminata.",
+"In un parco tutto bianco.",
+"Sul tetto di casa.",
+"In una foresta magica.",
+"In un mercatino di Natale.",
+"Nella stanza dei sogni.",
+"In una tenda invernale.",
+"In un igloo accogliente.",
+"In un mondo di zucchero.",
+"In una stanza addobbata.",
+"In un trenino in viaggio.",
+"In un lago ghiacciato.",
+"Vicino al camino.",
+"In un palazzo gigante.",
+"Nel cielo stellato.",
+"In una fattoria innevata.",
+"In una biblioteca natalizia.",
+"In una sala per i regali.",
+"In un villaggio di luci.",
+"In un sogno dei bambini.",
+"Su una nuvola candida.",
+"Sotto un grande abete.",
+"In una stanza segreta.",
+"Nella stanza dei giocattoli.",
+"In una metropoli festosa.",
+"In una slitta volante.",
+"In un grande parco giochi.",
+"In una stanza nascosta del Polo Nord.",
+"In un villaggio di animali.",
+"In un mondo immaginario.",
+"Sul pianeta del Natale.",
+"In un rifugio caldo.",
+"Nel cuore del bosco incantato."
   ];
+  const subset = randomSample(list, 10);
   const cont = document.createElement("div");
   cont.className = "suggestions";
-  list.forEach((t) => {
+  subset.forEach((t) => {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "suggestion-chip";
@@ -1313,20 +1518,61 @@ function showQuestion3Suggestions() {
 function showQuestion4Suggestions() {
   clearSuggestions();
   const list = [
-    "Una sorpresa di Natale cambia tutto.",
-    "Il regalo sparisce e lo dobbiamo cercare.",
-    "Babbo Natale si è raffreddato!",
-    "Le renne fanno una gara.",
-    "Le luci dell’albero parlano.",
-    "Tutti iniziano a cantare senza motivo.",
-    "Un bambino aiuta un elfo in difficoltà.",
-    "Una neve magica fa brillare le cose.",
-    "Una festa con biscotti e campanelle.",
-    "Un sogno diventa vero."
+"Babbo Natale perde un regalo.",
+"Una renna impara a volare.",
+"Gli elfi creano un giocattolo speciale.",
+"Una bambina trova una stella caduta.",
+"Un pupazzo prende vita.",
+"Arriva la prima neve dell’anno.",
+"Un regalo parla e racconta la sua storia.",
+"Un coro di bambini canta all’unisono.",
+"Le luci dell’albero si accendono da sole.",
+"Un elfo fa un pasticcio divertente.",
+"Una cometa guida i bimbi.",
+"Una slitta vola tra le case.",
+"Un sogno diventa realtà.",
+"La neve fa una sorpresa.",
+"Una renna si perde e viene ritrovata.",
+"I bambini costruiscono un pupazzo magico.",
+"Un trenino porta gioia ovunque.",
+"Gli animali del bosco festeggiano.",
+"La Befana incontra Babbo Natale.",
+"Un regalo gigante esplode in coriandoli.",
+"Una lanterna illumina la notte.",
+"Un elfo scopre il significato del Natale.",
+"Un magico countdown comincia.",
+"Il cielo si riempie di stelle danzanti.",
+"Una porta segreta si apre.",
+"I bambini aiutano Babbo Natale.",
+"Il gatto combina guai.",
+"Il pupazzo cerca un amico.",
+"Una campanella chiama tutti a festeggiare.",
+"Un giocattolo vuole un bambino.",
+"La neve canta una melodia.",
+"Una fata porta un dono speciale.",
+"Un pinguino viene invitato alla festa.",
+"La città si illumina.",
+"Un bambino scrive una lettera magica.",
+"La slitta non parte e bisogna ripararla.",
+"Una sorpresa arriva nella notte.",
+"I fiocchi di neve raccontano storie.",
+"Gli elfi ballano.",
+"Una festa nasce per caso.",
+"La magia sveglia un vecchio orologio.",
+"Una cometa porta un messaggio.",
+"Un coro salva il Natale.",
+"Un regalo vola via e tutti lo inseguono.",
+"Un bambino ritrova la magia perduta.",
+"Un elfo inventa una macchina buffa.",
+"Le stelle fanno un concerto.",
+"Un pupazzo diventa eroe.",
+"Una renna salva la notte.",
+"Tutti uniscono le forze per festeggiare."
   ];
+  const subset = randomSample(list, 10);
   const cont = document.createElement("div");
   cont.className = "suggestions";
-  list.forEach((t) => {
+  subset.forEach((t) => {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "suggestion-chip";
@@ -1347,20 +1593,62 @@ function showQuestion4Suggestions() {
 function showQuestion5Suggestions() {
   clearSuggestions();
   const list = [
-    "Tanta allegria!",
-    "La magia che fa battere il cuore.",
-    "La sorpresa che ti fa dire ‘Wow!’.",
-    "La tenerezza.",
-    "La felicità di stare insieme.",
-    "La calma della neve che scende.",
-    "L’emozione dell’attesa.",
-    "La voglia di abbracciarsi tutti.",
-    "La sensazione di un desiderio che si avvera.",
-    "Un po’ di mistero!"
+    "Gioia pura.",
+"Magia scintillante.",
+"Sorpresa.",
+"Tenerezza.",
+"Allegria.",
+"Meraviglia.",
+"Calore.",
+"Avventura.",
+"Speranza.",
+"Dolcezza.",
+"Entusiasmo.",
+"Curiosità.",
+"Amicizia.",
+"Emozione.",
+"Felicità contagiosa.",
+"Fantasia.",
+"Serenità.",
+"Fiducia.",
+"Amore.",
+"Generosità.",
+"Spirito di festa.",
+"Pace.",
+"Incanto.",
+"Tranquillità.",
+"Motivazione.",
+"Solidarietà.",
+"Stupore.",
+"Magia interiore.",
+"Brillantezza.",
+"Complicità.",
+"Energia.",
+"Leggerezza.",
+"Sogno.",
+"Unione.",
+"Euforia.",
+"Nostalgia dolce.",
+"Scintille di felicità.",
+"Gioia condivisa.",
+"Attesa emozionata.",
+"Allegria danzante.",
+"Ottimismo.",
+"Coraggio.",
+"Momenti speciali.",
+"Sorrisi.",
+"Gratitudine.",
+"Magia buona.",
+"Armonia.",
+"Meraviglia infantile.",
+"Spensieratezza.",
+"Calore familiare."
+
   ];
+  const subset = randomSample(list, 10);
   const cont = document.createElement("div");
   cont.className = "suggestions";
-  list.forEach((t) => {
+  subset.forEach((t) => {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "suggestion-chip";
@@ -1381,20 +1669,61 @@ function showQuestion5Suggestions() {
 function showQuestion6Suggestions() {
   clearSuggestions();
   const list = [
-    "Magia, magia!",
-    "Din don dan!",
-    "Natale è qua!",
-    "Brilla, brilla!",
-    "Yo-ho-ho!",
-    "Tutti insieme!",
-    "Neve che cade!",
-    "Felice Natale!",
-    "Sogna con me!",
-    "Lalalalalà!"
+"Magia, magia!",
+"Brilla Natale!",
+"Toc toc, sorpresa!",
+"Ehi, che festa!",
+"Din don dan!",
+"È Natale qui con te!",
+"Luci e sogni!",
+"Voliamo su!",
+"Che felicità!",
+"Oh oh oh!",
+"Stella mia!",
+"Accendi la magia!",
+"Batti le mani!",
+"È tempo di gioia!",
+"Sotto l’albero!",
+"Brillano i cuori!",
+"Canta con me!",
+"Buon Natale a te!",
+"Nel cielo blu!",
+"Ding dong!",
+"Evviva la festa!",
+"Magico sarà!",
+"Un sogno così!",
+"Allegria!",
+"Fiocca la felicità!",
+"Natalissimo!",
+"Stelle a volontà!",
+"Voliamo insieme!",
+"C’è magia!",
+"Un regalo per te!",
+"Festa, festa, festa!",
+"Che bello che è!",
+"Gira la magia!",
+"Lalalalala!",
+"Sogna con me!",
+"È festa ormai!",
+"Un mondo di luce!",
+"Oh, che magia!",
+"Sempre insieme!",
+"Un Natale così!",
+"Fiocchi nel cuor!",
+"Brilliamo noi!",
+"Salta con me!",
+"Un sorriso in più!",
+"Canta Natale!",
+"Vieni qui con me!",
+"Brilla forte!",
+"E che festa sia!",
+"Magia per te!",
+"Sotto il cielo blu!"
   ];
+  const subset = randomSample(list, 10);
   const cont = document.createElement("div");
   cont.className = "suggestions";
-  list.forEach((t) => {
+  subset.forEach((t) => {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "suggestion-chip";
@@ -1415,20 +1744,61 @@ function showQuestion6Suggestions() {
 function showQuestion7Suggestions() {
   clearSuggestions();
   const list = [
-    "A essere gentili.",
-    "A condividere.",
-    "Ad aiutare chi è triste.",
-    "A dire grazie.",
-    "A non litigare.",
-    "A credere nei propri sogni.",
-    "A non sprecare nulla.",
-    "A volersi bene.",
-    "A non arrendersi.",
-    "A sorridere di più."
+"Essere gentili.",
+"Condividere i giochi.",
+"Aiutare i più piccoli.",
+"Dire grazie.",
+"Dire scusa.",
+"Collaborare.",
+"Non arrendersi.",
+"Avere fiducia.",
+"Credere nei sogni.",
+"Saper aspettare.",
+"Essere generosi.",
+"Amare gli amici.",
+"Sorridere sempre.",
+"Rispettare gli altri.",
+"Fare un gesto buono.",
+"Accogliere tutti.",
+"Portare gioia.",
+"Essere grati.",
+"Essere coraggiosi.",
+"Non giudicare.",
+"Donare tempo.",
+"Raccontare la verità.",
+"Valorizzare la famiglia.",
+"Rispettare la natura.",
+"Salvaguardare la magia.",
+"Essere creativi.",
+"Aiutare chi ha bisogno.",
+"Essere pazienti.",
+"Capire gli altri.",
+"Dare il buon esempio.",
+"Diffondere felicità.",
+"Essere amici della pace.",
+"Ascoltare gli altri.",
+"Dare un sorriso.",
+"Fare squadra.",
+"Credere in sé stessi.",
+"Essere curiosi.",
+"Essere responsabili.",
+"Non sprecare.",
+"Fare complimenti sinceri.",
+"Abbracciare chi si ama.",
+"Vivere con leggerezza.",
+"Cogliere la magia nel quotidiano.",
+"Essere gentili con gli animali.",
+"Non litigare.",
+"Usare parole dolci.",
+"Aiutare la famiglia.",
+"Tenere viva la fantasia.",
+"Festeggiare tutti insieme.",
+"Apprezzare le piccole cose."
   ];
+  const subset = randomSample(list, 10);
   const cont = document.createElement("div");
   cont.className = "suggestions";
-  list.forEach((t) => {
+  subset.forEach((t) => {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "suggestion-chip";
@@ -1449,20 +1819,61 @@ function showQuestion7Suggestions() {
 function showQuestion8Suggestions() {
   clearSuggestions();
   const list = [
-    "Veloce da ballare!",
-    "Lenta e dolce.",
-    "Veloce come le renne.",
-    "Lenta come la neve che cade.",
-    "Un po’ veloce e un po’ lenta.",
-    "Così veloce che non sto fermo!",
-    "Piano piano, come una ninna nanna.",
-    "Media, come una passeggiata.",
-    "Veloce come una festa.",
-    "Lenta per ascoltare bene le parole."
+    "Veloce e saltellante.",
+"Lenta e magica.",
+"Allegra e ritmata.",
+"Dolce e tranquilla.",
+"Super energica.",
+"Morbida e calma.",
+"Veloce come una slitta.",
+"Lenta come la neve.",
+"Scattante e divertente.",
+"Luminosa e lieve.",
+"Un misto di veloce e lenta.",
+"Ritmata come un jingle.",
+"Sussurrata e leggera.",
+"Festosa.",
+"Serenata lenta.",
+"Rock leggero.",
+"Swing vivace.",
+"Danzerina.",
+"Sognante.",
+"Battito moderato.",
+"Velocità media.",
+"Crescente.",
+"Lenta ma luminosa.",
+"Veloce e brillante.",
+"Saltellante.",
+"Ipnotica e calma.",
+"Movimentata.",
+"Fluida.",
+"Scorrevole.",
+"Lieve.",
+"Ritmo calmo.",
+"Ritmo scattante.",
+"Vibrazione lenta.",
+"Esplosiva.",
+"Passeggiata musicale.",
+"Galoppante.",
+"Onde sonore lente.",
+"Pulsante.",
+"Rapida e gioiosa.",
+"Avvolgente.",
+"Lenta come un sogno.",
+"Veloce come la felicità.",
+"Ritmo frizzante.",
+"Ritmo tenero.",
+"Energia media.",
+"Lenta per il ritornello.",
+"Veloce per le strofe.",
+"Una dolce filastrocca.",
+"Una marcia vivace.",
+"Una ballata lenta."
   ];
+  const subset = randomSample(list, 10);
   const cont = document.createElement("div");
   cont.className = "suggestions";
-  list.forEach((t) => {
+  subset.forEach((t) => {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "suggestion-chip";
@@ -1483,20 +1894,61 @@ function showQuestion8Suggestions() {
 function showQuestion9Suggestions() {
   clearSuggestions();
   const list = [
-    "Le campanelle!",
-    "Il pianoforte.",
-    "La chitarra.",
-    "Il violino.",
-    "Il flauto.",
-    "Il tamburello.",
-    "Il sassofono.",
-    "La batteria.",
-    "L’arpa.",
-    "Le percussioni di legno che fanno toc toc!"
+"Campanellini della Slitta , Arpa , Violino", 
+"Celesta , Flauto Traverso , Triangolo", 
+"Coro di Bambini , Pianoforte , Campanelli a mano", 
+"Carillon , Arpa , Vento (effetto sonoro)", 
+"Campanellini della Slitta , Tromba , Tamburo (rullante)", 
+"Violino , Violoncello , Triangolo", 
+"Glockenspiel (o Xilofono metallico) , Arpa , Flauto Dolce", 
+"Sezione Archi , Tromba , Timpani (Tamburi grandi)", 
+"Pianoforte , Violino , Campanellini", 
+"Triangolo , Celesta , Pizzicato (Violini suonati con le dita)", 
+"Chitarra Elettrica , Batteria , Basso", 
+"Tastiera Elettronica , Batteria , Battito di Mani (Clap)", 
+"Sassofono , Pianoforte , Schiocco di dita", 
+"Ukulele , Fischio , Tamburello", 
+"Chitarra Elettrica , Campanelli della Slitta , Batteria", 
+"Sintetizzatore , Drum Machine (Beatbox) , Basso", 
+"Pianoforte Jazz , Contrabbasso , Spazzole (Batteria soft)", 
+"Chitarra Acustica , Tamburello , Piede che batte", 
+"Tastiera , Suoni Robot , Cassa dritta (Boom Boom)", 
+"Chitarra Elettrica , Batteria veloce , Tromba", 
+"Tamburo , Flauto Dolce , Trombetta", 
+"Tuba , Clarinetto , Piatti", 
+"Kazoo , Banjo , Clacson/Trombetta", 
+"Fisarmonica , Tuba , Tamburello", 
+"Xilofono (veloce) , Flauto , Legnetti", 
+"Voce Robot , Sintetizzatore , Bip-Bop", 
+"Pizzicato (Archi) , Fagotto , Triangolo", 
+"Grancassa , Piatti , Tromba", 
+"Banjo , Armonica a bocca , Battito di mani", 
+"Pianoforte veloce , Xilofono , Effetto Boing", 
+"Carillon , Flauto Dolce", 
+"Arpa , Violoncello", 
+"Chitarra Acustica (arpeggio) , Piano dolce", 
+"Arpa , Coro di voci bianche", 
+"Celesta , Pianoforte lento", 
+"Violoncello , Chitarra classica", 
+"Flauto di Pan , Chitarra acustica", 
+"Glockenspiel , Vibrafono (suono morbido)", 
+"Organo dolce , Flauto", 
+"Pianoforte Giocattolo (lento) , Archi leggeri", 
+"Ukulele , Maracas , Onde del mare", 
+"Cornamusa , Flauto , Tamburello", 
+"Chitarra Classica , Maracas , Bonghi", 
+"Fisarmonica , Clarinetto , Tuba", 
+"Violino (Fiddle) , Chitarra Acustica , Banjo", 
+"Bonghi , Legnetti , Marimba (Xilofono di legno)", 
+"Fisarmonica , Tamburello , Mandolino", 
+"Organo Hammond , Battito di Mani , Tamburo", 
+"Fisarmonica , Violino , Contrabbasso", 
+"Corno , Flauto , Chitarra Acustica"
   ];
+  const subset = randomSample(list, 10);
   const cont = document.createElement("div");
   cont.className = "suggestions";
-  list.forEach((t) => {
+  subset.forEach((t) => {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "suggestion-chip";
@@ -1520,9 +1972,10 @@ function showConsentSuggestions() {
     "SÌ, ACCONSENTO",
     "NON, ACCONSENTO"
   ];
+  const subset = randomSample(list, 2);
   const cont = document.createElement("div");
   cont.className = "suggestions";
-  list.forEach((t) => {
+  subset.forEach((t) => {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "suggestion-chip";
@@ -1559,6 +2012,7 @@ function showConsentSuggestions() {
             if (otpGate) otpGate.style.display = "grid";
             if (userInput) userInput.disabled = true;
             try { otpInput && otpInput.focus(); } catch (_) {}
+            
           } else {
             gatePhase = "otp";
             otpAttempts = 0;
@@ -1588,20 +2042,61 @@ function showConsentSuggestions() {
 function showQuestion10Suggestions() {
   clearSuggestions();
   const list = [
-    "Pop, così è allegra.",
-    "Filastrocca, per cantare tutti insieme.",
-    "Classica, come nei film di Natale.",
-    "Rock leggero, perché è divertente.",
-    "Swing, così si balla!",
-    "Musica natalizia tradizionale.",
-    "Pop con un po’ di magia.",
-    "Filastrocca molto ritmata.",
-    "Classica con le campanelle.",
-    "Rock ma morbido morbido."
+"Pop natalizio.",
+"Filastrocca allegra.",
+"Classica dolce.",
+"Rock leggerissimo.",
+"Swing festoso.",
+"Tradizionale natalizia.",
+"Pop moderno.",
+"Filastrocca ritmata.",
+"Classica magica.",
+"Rock fiabesco.",
+"Swing elegante.",
+"Corale natalizio.",
+"Pop infantile.",
+"Filastrocca lenta.",
+"Filastrocca veloce.",
+"Classica brillante.",
+"Rock giocoso.",
+"Swing sorridente.",
+"Gospel natalizio.",
+"Pop sognante.",
+"Filastrocca dolce.",
+"Classica incantata.",
+"Ballata natalizia.",
+"Pop ritmato.",
+"Rock natalizio.",
+"Swing anni ‘50.",
+"Filastrocca in rima.",
+"Musica da carillon.",
+"Pop-orchestrale.",
+"Musica cinematica.",
+"Filastrocca molto breve.",
+"Musica da cartone animato.",
+"Pop leggero.",
+"Pop ballabile.",
+"Musica simile ai jingle.",
+"Armonie classiche.",
+"Folk natalizio.",
+"Pop elettronico leggero.",
+"Filastrocca giocosa.",
+"Pop tenero.",
+"Filastrocca swingata.",
+"Rock dei bambini.",
+"Pop delicato.",
+"Classica per fiabe.",
+"Brano da musical.",
+"Pop acustico.",
+"Filastrocca molto ritmata.",
+"Musica tradizionale del Nord.",
+"Pop gioioso.",
+"Filastrocca a coro."
   ];
+  const subset = randomSample(list, 10);
   const cont = document.createElement("div");
   cont.className = "suggestions";
-  list.forEach((t) => {
+  subset.forEach((t) => {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "suggestion-chip";
@@ -1660,6 +2155,16 @@ function autoResize() {
   userInput.style.height = h + "px";
 }
 userInput.addEventListener("input", autoResize);
+
+userInput.addEventListener("input", () => {
+  if (!shouldFilterNow()) return;
+  const v = userInput.value || "";
+  const s = sanitizeForbidden(v);
+  if (s !== v) {
+    userInput.value = s;
+    autoResize();
+  }
+});
 
 function showKeyboardFor(el) {
   try {
@@ -1833,13 +2338,13 @@ window.addEventListener("DOMContentLoaded", () => {
       if (emailError) emailError.style.display = "none";
       const res = await verifyAppCode(vCodeU);
       if (!res.found) {
-        if (emailError) emailError.textContent = "Codice App non valido";
+        if (emailError) emailError.textContent = "Voucher non valido";
         if (emailError) emailError.style.display = "block";
         try { emailCodeInput.focus(); } catch (_) {}
         return;
       }
       if (res.used) {
-        if (emailError) emailError.textContent = "Codice App già utilizzato";
+        if (emailError) emailError.textContent = "Voucher già utilizzato";
         if (emailError) emailError.style.display = "block";
         try { emailCodeInput.focus(); } catch (_) {}
         return;
@@ -1903,10 +2408,10 @@ window.addEventListener("DOMContentLoaded", () => {
       try {
         const updated = await markAppCodeUsed(userAccessCode, userEmail, otpVerifiedAt, "Y", userConsentOTP);
         if (!updated) {
-          renderMessage("Aggiornamento remoto del Codice App non riuscito. Riprova più tardi.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+          renderMessage("Aggiornamento remoto del Voucher non riuscito. Riprova più tardi.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
         }
       } catch (_) {
-        renderMessage("Aggiornamento remoto del Codice App non riuscito. Riprova più tardi.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+        renderMessage("Aggiornamento remoto del Voucher non riuscito. Riprova più tardi.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
       }
       if (otpGate) otpGate.style.display = "none";
       gatePhase = null;
