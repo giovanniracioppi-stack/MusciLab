@@ -109,6 +109,7 @@ let gatePhase = null;
 let avatarAudioEnabled = false;
 let avatarVideoAllowed = false;
 let suggestionsEl = null;
+let switchingVideo = false;
 function escapeRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 const FORBIDDEN_WORDS = [
   "cazzo","cazzata","incazzato","merda","merdoso","stronzo","stronza","stronzata","vaffanculo","fanculo","coglione","coglioni","palle","rottura di palle","bastardo","bastarda","puttana","troia","zoccola","mignotta","bagascia","baldracca","scrofa","vacca","figlio di puttana","fottiti","fottere","fottuto","porca","porco","madonna","dio","cristo","gesù","santo","mannaggia","cacchio","cavolo","culo","culone","chiappe","sedere","pisciare","cagare","piscia","cacca","puzzone",
@@ -280,6 +281,7 @@ function updateHeaderAvatar(av) {
 
   // Prova a caricare e riprodurre il video
   if (avatarVideo) {
+    switchingVideo = true;
     try {
       avatarVideo.pause();
     } catch (_) {}
@@ -322,6 +324,7 @@ function updateHeaderAvatar(av) {
       showVideo();
       try { avatarVideo.currentTime = 0; } catch (_) {}
       avatarVideo.play().catch(() => {});
+      switchingVideo = false;
     };
     avatarVideo.addEventListener("canplaythrough", canplayHandler, { once: true });
     avatarVideo.addEventListener("canplay", canplayHandler, { once: true });
@@ -2205,7 +2208,7 @@ function tryUnmuteAvatar() {
   if (!avatarVideoAllowed) return;
   avatarAudioEnabled = true;
   avatarVideo.muted = false;
-  avatarVideo.play().catch(() => {});
+  if (switchingVideo) return;
 }
 
 function enableAudioFromStart() {
