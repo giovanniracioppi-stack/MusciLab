@@ -19,6 +19,7 @@ const BASE_QUESTIONS = [
   `🎁 Che tipo di musica preferisci tra: pop, filastrocca, classica, rock leggero, swing, o infine natalizia tradizionale?`
 ];
 const MUSICLAB_QUESTIONS_ORDER = [1,2,6,8,9,10];
+const MUSICLAB_VIDEOS_ORDER = null;
 function _parseOrder(s) {
   let arr;
   if (Array.isArray(s)) arr = s;
@@ -34,11 +35,12 @@ const QUESTIONS_ORDER = _parseOrder(MUSICLAB_QUESTIONS_ORDER) || _defaultOrder;
 const avatars = Array.from({ length: QUESTIONS_ORDER.length }, (_, i) => {
   const id = i + 1;
   const baseId = QUESTIONS_ORDER[i];
+  const videoBaseId = Array.isArray(MUSICLAB_VIDEOS_ORDER) && MUSICLAB_VIDEOS_ORDER.length > i ? MUSICLAB_VIDEOS_ORDER[i] : baseId;
   return {
     id,
     name: "DoReMilla",
     initial: "DM",
-    video: `Avatar_${id}.mp4`,
+    video: `Avatar_${videoBaseId}.mp4`,
     question: BASE_QUESTIONS[baseId - 1],
     baseId: baseId
   };
