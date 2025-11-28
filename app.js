@@ -877,10 +877,10 @@ async function notifyEmailWithSong(subject, songText, songUrl) {
   const codiciLinkLineText = codiciUrl ? `\nLink download CodiciAPP: ${codiciUrl}` : "";
   const codiciErrLineText = codiciErr ? `\nErrore pubblicazione CodiciAPP: ${codiciErr}` : "";
   const bodyText = "Grazie per aver dato voce al Natale con \u201cCurno AI Christmas Sound\u201d!\n Hai appena creato la tua canzone unica… ora è il momento di farla risuonare!\n Scaricala qui e, se ti va, condividila con noi: ci piacerebbe sentirla!\n Tagga il Centro Commerciale Curno e usa gli hashtag: \n di seguito il testo della tua canzone " + songText + "\n #MyXmasSound #CurnoVibes #NataleInNote \n " + consentLineText + codeLineText + songLinkLineText + codiciLinkLineText + codiciErrLineText;
-  const bodyHtml = "<div>Grazie per aver dato voce al Natale con \u201cCurno AI Christmas Sound\u201d!</div>" +
-                   "<div>Hai appena creato la tua canzone unica… ora è il momento di farla risuonare!</div>" +
-                   "<div>Scaricala qui e, se ti va, condividila con noi: ci piacerebbe sentirla!</div>" +
-                   "<div>Tagga il Centro Commerciale Curno e usa gli hashtag:</div>" +
+  const bodyHtml = "<div>La tua creatività ha acceso la magia del Natale ✨🎄 e la tua canzone è pronta a suonare forte 🎶🔥.</div>" +
+                   "<div>Scaricala qui 📥 e condividi il risultato sui tuoi social 📲!</div>" +
+                   "<div>Tagga @centrocommercialecurno 📸 e non dimenticare l’hashtag #CurnoChristmasMelodie ❄️🎵.</div>" +
+                   "<div>Non vediamo l’ora di ascoltare la tua musica! 🎧❤️</div>" +
                    "<div>di seguito il testo della tua canzone</div>" +
                    "<pre style=\"white-space:pre-wrap;\">" + songText.replace(/</g, "&lt;") + "</pre>" +
                    "<div>#MyXmasSound #CurnoVibes #NataleInNote</div>" +
