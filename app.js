@@ -16,7 +16,7 @@ const BASE_QUESTIONS = [
   `🪄 Vuoi che la canzone insegni qualcosa? Ad esempio, essere gentili, condividere, aiutare gli altri?`,
   `🔔 Preferisci una musica veloce o lenta?`,
   `🌟 Quali strumenti ti piacciono di più per una canzone di Natale?`,
-  `🎁 Che tipo di musica preferisci tra: pop, filastrocca, classica, rock leggero, swing, o infine natalizia tradizionale?`
+  `🎁 Che musica ti piace di più? Pop, filastrocche, classica, rock, melodica o natalizia?`
 ];
 const MUSICLAB_QUESTIONS_ORDER = [1,2,6,8,9,10];
 const MUSICLAB_VIDEOS_ORDER = null;
@@ -89,6 +89,8 @@ const emailInput = document.getElementById("emailInput");
 const emailConfirmBtn = document.getElementById("emailConfirmBtn");
 const emailError = document.getElementById("emailError");
 const emailCodeInput = document.getElementById("emailCodeInput");
+const gdprPanel = document.getElementById("gdprPanel");
+const gdprCloseBtn = document.getElementById("gdprCloseBtn");
 const codiciFileInput = document.getElementById("codiciFileInput");
 const uploadCodiciBtn = document.getElementById("uploadCodiciBtn");
 const otpGate = document.getElementById("otpGate");
@@ -140,8 +142,11 @@ function containsForbidden(text) {
   return false;
 }
 const introLines = [
-  "Ehi tu! 🎁\nSì, proprio tu che ami il Natale! ✨\nHai mai pensato… di creare la tua canzone di Natale?\nUna canzone tutta tua, piena di emozioni, suoni e magia? 🎶\nBene! Oggi diventi tu il compositore del Natale! 😍\nIo ti farò dieci domande super speciali… e con le tue risposte, creeremo insieme la canzone più magica dell’anno!\nPronto? 3… 2… 1… via! 🌟"
+  "Ci siamo! Adesso puoi creare la tua canzone. Rispondi alle 6 domande, scegliendo tra le proposte oppure consiglia tu quello che vorresti ascoltare nel testo della canzone."
 ];
+//const introLines = [
+//  "Ehi tu! 🎁\nSì, proprio tu che ami il Natale! ✨\nHai mai pensato… di creare la tua canzone di Natale?\nUna canzone tutta tua, piena di emozioni, suoni e magia? 🎶\nBene! Oggi diventi tu il compositore del Natale! 😍\nIo ti farò dieci domande super speciali… e con le tue risposte, creeremo insieme la canzone più magica dell’anno!\nPronto? 3… 2… 1… via! 🌟"
+//];
 const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SpeechRec) {
   recognition = new SpeechRec();
@@ -368,10 +373,26 @@ function scrollToBottom() {
 
 function startCountdown(seconds) {
   let s = Math.max(1, seconds | 0);
+  const total = s;
   const bubble = document.createElement("div");
   bubble.className = "message avatar";
   const textEl = document.createElement("div");
+  textEl.style.fontWeight = "600";
+  textEl.style.transform = "scale(1)";
+  textEl.style.transition = "transform 250ms ease";
   textEl.textContent = `Ricarico tra ${s}s`;
+  const barWrap = document.createElement("div");
+  barWrap.style.height = "18px";
+  barWrap.style.background = "#eee";
+  barWrap.style.borderRadius = "9px";
+  barWrap.style.overflow = "hidden";
+  barWrap.style.marginTop = "10px";
+  const bar = document.createElement("div");
+  bar.style.height = "100%";
+  bar.style.width = "100%";
+  bar.style.background = "linear-gradient(90deg,#e53935,#fb8c00)";
+  bar.style.transition = "width 1000ms linear";
+  barWrap.appendChild(bar);
   const meta = document.createElement("div");
   meta.className = "bubble-meta";
   const tiny = document.createElement("div");
@@ -383,6 +404,7 @@ function startCountdown(seconds) {
   meta.appendChild(tiny);
   meta.appendChild(who);
   bubble.appendChild(textEl);
+  bubble.appendChild(barWrap);
   bubble.appendChild(meta);
   messagesEl.appendChild(bubble);
   scrollToBottom();
@@ -394,6 +416,9 @@ function startCountdown(seconds) {
       return;
     }
     textEl.textContent = `Ricarico tra ${s}s`;
+    try { textEl.style.transform = "scale(1.08)"; setTimeout(() => { textEl.style.transform = "scale(1)"; }, 220); } catch (_) {}
+    const pct = Math.max(0, Math.min(100, Math.round((s / total) * 100)));
+    bar.style.width = pct + "%";
     scrollToBottom();
   }, 1000);
 }
@@ -435,6 +460,25 @@ function renderMessage(text, sender = "avatar", av = null) {
   bubble.appendChild(meta);
   messagesEl.appendChild(bubble);
   scrollToBottom();
+}
+
+function showGdprInfoButton() {
+  const wrap = document.createElement("div");
+  wrap.style.marginTop = "8px";
+  const btn = document.createElement("button");
+  btn.id = "gdprInfoInlineBtn";
+  btn.className = "email-btn";
+  btn.type = "button";
+  btn.textContent = "Informativa";
+  wrap.appendChild(btn);
+  messagesEl.appendChild(wrap);
+  scrollToBottom();
+  btn.addEventListener("click", () => {
+    if (gdprPanel) {
+      gdprPanel.style.display = "block";
+      try { gdprPanel.scrollIntoView({ block: "center" }); } catch (_) {}
+    }
+  });
 }
 
 // Sequenza di messaggi dell'assistente (intro/outro) con indicatore di digitazione
@@ -568,8 +612,8 @@ let secretsPromise = null;
 async function loadSecrets() {
   if (secretsPromise) return secretsPromise;
   secretsPromise = (async () => {
-    const backendUrl = localStorage.getItem("MUSICLAB_BACKEND_URL") || "https://hyperlabs.pythonanywhere.com/";
-    //const backendUrl = localStorage.getItem("MUSICLAB_BACKEND_URL") || "http://localhost:8888/";
+    //const backendUrl = localStorage.getItem("MUSICLAB_BACKEND_URL") || "https://hyperlabs.pythonanywhere.com/";
+    const backendUrl = localStorage.getItem("MUSICLAB_BACKEND_URL") || "http://localhost:8888/";
     return { backendUrl };
   })();
   return secretsPromise;
@@ -638,7 +682,7 @@ async function createSongAndEmail(lyricsText) {
     const url = await pollProducerTask(taskId);
     if (url) {
       const appCode = userAccessCode;
-      await notifyEmailWithSong("MusicLab — Link per il download", lyricsText, url);
+      await notifyEmailWithSong("ECCO LA TUA CANZONE DI NATALE", lyricsText, url);
       await appendCanzoniLog(appCode, taskId, url);
       if (String(localStorage.getItem("AIMUSIC_AUTODOWNLOAD") || "false") === "true") {
         await autoDownloadSong(url);
@@ -878,15 +922,14 @@ async function notifyEmailWithSong(subject, songText, songUrl) {
   const codiciErrLineText = codiciErr ? `\nErrore pubblicazione CodiciAPP: ${codiciErr}` : "";
   const bodyText = "Grazie per aver dato voce al Natale con \u201cCurno AI Christmas Sound\u201d!\n Hai appena creato la tua canzone unica… ora è il momento di farla risuonare!\n Scaricala qui e, se ti va, condividila con noi: ci piacerebbe sentirla!\n Tagga il Centro Commerciale Curno e usa gli hashtag: \n di seguito il testo della tua canzone " + songText + "\n #MyXmasSound #CurnoVibes #NataleInNote \n " + consentLineText + codeLineText + songLinkLineText + codiciLinkLineText + codiciErrLineText;
   const bodyHtml = "<div>La tua creatività ha acceso la magia del Natale ✨🎄 e la tua canzone è pronta a suonare forte 🎶🔥.</div>" +
-                   "<div>Scaricala qui 📥 e condividi il risultato sui tuoi social 📲!</div>" +
-                   "<div>Tagga @centrocommercialecurno 📸 e non dimenticare l’hashtag #CurnoChristmasMelodie ❄️🎵.</div>" +
+                   "<div>Scaricala qui:" + `<a href="${songUrl}" target="_blank" rel="noopener">Download</a>` + " 📥 e condividi il risultato sui tuoi social 📲!</div>" +
+                   "<div>Tagga @centrocommercialecurno 📸 e non dimenticare l’hashtag #NataleaCurno. ❄️🎵.</div>" +
                    "<div>Non vediamo l’ora di ascoltare la tua musica! 🎧❤️</div>" +
                    "<div>di seguito il testo della tua canzone</div>" +
                    "<pre style=\"white-space:pre-wrap;\">" + songText.replace(/</g, "&lt;") + "</pre>" +
                    "<div>#MyXmasSound #CurnoVibes #NataleInNote</div>" +
                    `<div>Consenso informato dato in data: ${otpVerifiedAt || "-"}, tramite codice otp inviato a ${userEmail || "-"}</div>` +
-                   `<div>Generazione avvenuta con codica attivazione: ${userAccessCode || "-"}</div>` +
-                   (songUrl ? `<div>Link download canzone: <a href="${songUrl}" target="_blank" rel="noopener">${songUrl}</a></div>` : "") +
+                   `<div>Generazione avvenuta con codica attivazione: ${userAccessCode || "-"}</div>` +                   
                    (codiciUrl ? `<div>Link download CodiciAPP: <a href="${codiciUrl}" target="_blank" rel="noopener">${codiciUrl}</a></div>` : "");
   const recipients = [userEmail, "eventi.centrocommercialecurno@hyperlabs.it"].filter(Boolean);
   const remote = backendUrl.endsWith("/") ? backendUrl + "send-email" : backendUrl + "/send-email";
@@ -899,6 +942,7 @@ async function notifyEmailWithSong(subject, songText, songUrl) {
     });
     if (res.ok) {
       renderMessage("Email inviata! Controlla la tua casella.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+      startCountdown(10);
       done = true;
     } else {
       let detail = "";
@@ -922,6 +966,7 @@ async function notifyEmailWithSong(subject, songText, songUrl) {
       });
       if (res2.ok) {
         renderMessage("Email inviata! Controlla la tua casella.", "avatar", { id: 99, name: "Assistente", initial: "ML" });
+        startCountdown(10);
         done = true;
       } else {
         let detail2 = "";
@@ -1135,7 +1180,8 @@ async function handleUserAnswer(text) {
         return;
       }
       userAccessCode = codeUpper;
-      const consent = `Per proseguire ho bisogno del tuo consenso al trattamento dei dati.\n\nFinalità e dati trattati:\n1) Invio della canzone generata → uso della tua e-mail.\n2) Invio di OTP via MAIL per confermare la tua identità.\n3) Uso della voce del minore per dialogo con l’assistente virtuale (solo con consenso del genitore/tutore).\n\nBase giuridica: tuo consenso (art. 6 e art. 8 GDPR).\nModalità: dati trattati in modo sicuro e non condivisi con terzi non autorizzati.\nConservazione: solo per il tempo necessario al servizio.\n\nPer acconsentire clicca su "SÌ, ACCONSENTO" in modo da consentirci l'invio del codice OTP per confermare il consenso`;
+      if (emailGate) emailGate.style.display = "none";
+      const consent = `Grazie! Per proseguire, è necessario che acconsenti al trattamento dei seguenti dati:\n1) Invio della canzone generata → uso della tua e-mail.\n2) Invio di OTP via MAIL per confermare la tua identità.\n3) Uso della voce del minore per dialogo con l’assistente virtuale (solo con consenso del genitore/tutore).\n\nLeggi attentamente l'informativa cliccacndo su "INFORMATIVA".\n\nSuccessivamente per acconsentire clicca su "SÌ, ACCONSENTO" in modo da consentirci l'invio del codice OTP per confermare il consenso`;
       renderMessage(consent, "avatar", who);
       try { showConsentSuggestions(); } catch (_) {}
       gatePhase = "phone";
@@ -1336,6 +1382,7 @@ function showQuestion1Suggestions() {
     });
     cont.appendChild(chip);
   });
+  // Rimosso: il chip "Informativa trattamento dati" non viene più proposto tra le opzioni della domanda.
   suggestionsEl = cont;
   chatEl.appendChild(cont);
   scrollToBottom();
@@ -2375,6 +2422,7 @@ window.addEventListener("DOMContentLoaded", () => {
       const who = { id: 99, name: "Assistente", initial: "ML" };      
       const consent = `Per proseguire ho bisogno del tuo consenso al trattamento dei dati.\n\nFinalità e dati trattati:\n1) Invio della canzone generata → uso della tua e-mail.\n2) Invio di OTP via MAIL per confermare la tua identità.\n3) Uso della voce del minore per dialogo con l’assistente virtuale (solo con consenso del genitore/tutore).\n\nBase giuridica: tuo consenso (art. 6 e art. 8 GDPR).\nModalità: dati trattati in modo sicuro e non condivisi con terzi non autorizzati.\nConservazione: solo per il tempo necessario al servizio.\n\nPer acconsentire clicca su "SÌ, ACCONSENTO" in modo da consentirci l'invio del codice OTP per confermare il consenso`;
       renderMessage(consent, "avatar", who);
+      try { showGdprInfoButton(); } catch (_) {}
       try { showConsentSuggestions(); } catch (_) {}
       try { userInput.focus(); } catch (_) {}
     };
@@ -2390,6 +2438,11 @@ window.addEventListener("DOMContentLoaded", () => {
         ev.preventDefault();
         submitGate();
       }
+    });
+  }
+  if (gdprCloseBtn && gdprPanel) {
+    gdprCloseBtn.addEventListener("click", () => {
+      gdprPanel.style.display = "none";
     });
   }
   if (otpConfirmBtn && otpInput) {
