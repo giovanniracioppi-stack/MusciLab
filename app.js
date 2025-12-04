@@ -2669,7 +2669,7 @@ function showStartupPopup() {
   btn.style.border = "1px solid #ccc";
   btn.style.background = "#f5f5f5";
   btn.style.cursor = "pointer";
-  const imgs = ["step1.jpg","step2.jpg","step3.jpg","step4.jpg"];
+  const imgs = ["step1","step2","step3","step4"];
   let i = 0;
   let timer = null;
   const MORPH_MS = 1200;
@@ -2704,14 +2704,37 @@ function showStartupPopup() {
       } catch (_) { setTimeout(cb, 0); }
     }
   };
+  const loadImageSmart = (img, base, cb) => {
+    const b = String(base || "");
+    const bases = [b, b.toLowerCase(), b.toUpperCase(), b.charAt(0).toUpperCase() + b.slice(1)];
+    const exts = ["jpg","jpeg","png","webp"];
+    let bi = 0, ei = 0;
+    const tryNext = () => {
+      if (bi >= bases.length) { cb(); return; }
+      const candidate = bases[bi] + "." + exts[ei];
+      try {
+        img.onload = () => { img.onload = null; img.onerror = null; cb(); };
+        img.onerror = () => { img.onload = null; img.onerror = null; ei++; if (ei >= exts.length) { ei = 0; bi++; } tryNext(); };
+      } catch (_) {}
+      img.src = candidate;
+      if (img.complete) {
+        try {
+          if (img.naturalWidth > 0 || img.naturalHeight > 0) {
+            setTimeout(() => { if (typeof img.onload === "function") img.onload(); }, 0);
+          }
+        } catch (_) { setTimeout(() => { if (typeof img.onload === "function") img.onload(); }, 0); }
+      }
+    };
+    tryNext();
+  };
   const startSequence = () => {
-    loadImage(imgA, imgs[i], () => { updateSizeFrom(imgA); });
+    loadImageSmart(imgA, imgs[i], () => { updateSizeFrom(imgA); });
     i = (i + 1) % imgs.length;
-    loadImage(imgB, imgs[i], () => {});
+    loadImageSmart(imgB, imgs[i], () => {});
   };
   
   const advance = () => {
-    loadImage(imgA, imgs[i], () => {
+    loadImageSmart(imgA, imgs[i], () => {
       updateSizeFrom(imgA);
       i = (i + 1) % imgs.length;
     });
