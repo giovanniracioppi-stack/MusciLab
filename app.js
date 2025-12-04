@@ -612,8 +612,8 @@ let secretsPromise = null;
 async function loadSecrets() {
   if (secretsPromise) return secretsPromise;
   secretsPromise = (async () => {
-    //const backendUrl = localStorage.getItem("MUSICLAB_BACKEND_URL") || "https://hyperlabs.pythonanywhere.com/";
-    const backendUrl = localStorage.getItem("MUSICLAB_BACKEND_URL") || "http://localhost:8888/";
+    const backendUrl = localStorage.getItem("MUSICLAB_BACKEND_URL") || "https://hyperlabs.pythonanywhere.com/";
+    //const backendUrl = localStorage.getItem("MUSICLAB_BACKEND_URL") || "http://localhost:8888/";
     return { backendUrl };
   })();
   return secretsPromise;
