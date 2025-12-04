@@ -8,7 +8,7 @@ const palette = {
 
 const BASE_QUESTIONS = [
   `🎄 Che cosa ti piace di più del Natale?`,
-  `💫 Vuoi che nella canzone ci sia un personaggio speciale? Babbo Natale, un elfo, un animale, o proprio tu…?`,
+  `💫 Vuoi che nella canzone ci sia un personaggio speciale?`,
   `🎸 Dove si svolge la storia della tua canzone (nel bosco, a casa, al Polo Nord, a scuola…)?`,
   `🎵 Che cosa succede nella canzone? Mi racconti un momento speciale.`,
   `📜 Quali emozioni vuoi trasmettere? Che ne dici di allegria? O magari sorpresa? Meglio magia?`,
@@ -16,7 +16,7 @@ const BASE_QUESTIONS = [
   `🪄 Vuoi che la canzone insegni qualcosa? Ad esempio, essere gentili, condividere, aiutare gli altri?`,
   `🔔 Preferisci una musica veloce o lenta?`,
   `🌟 Quali strumenti ti piacciono di più per una canzone di Natale?`,
-  `🎁 Che musica ti piace di più? Pop, filastrocche, classica, rock, melodica o natalizia?`
+  `🎁 Che musica ti piace di più?`
 ];
 const MUSICLAB_QUESTIONS_ORDER = [1,2,6,8,9,10];
 const MUSICLAB_VIDEOS_ORDER = null;
@@ -612,8 +612,8 @@ let secretsPromise = null;
 async function loadSecrets() {
   if (secretsPromise) return secretsPromise;
   secretsPromise = (async () => {
-    const backendUrl = localStorage.getItem("MUSICLAB_BACKEND_URL") || "https://hyperlabs.pythonanywhere.com/";
-    //const backendUrl = localStorage.getItem("MUSICLAB_BACKEND_URL") || "http://localhost:8888/";
+    //const backendUrl = localStorage.getItem("MUSICLAB_BACKEND_URL") || "https://hyperlabs.pythonanywhere.com/";
+    const backendUrl = localStorage.getItem("MUSICLAB_BACKEND_URL") || "http://localhost:8888/";
     return { backendUrl };
   })();
   return secretsPromise;
@@ -887,6 +887,7 @@ async function sendConsentOtpEmail(email, code) {
       if (j2 && j2.error) {
         renderMessage("Invio OTP via e-mail non riuscito: " + j2.error, "avatar", { id: 99, name: "Assistente", initial: "ML" });
         if (j2.detail) renderMessage(String(j2.detail), "avatar", { id: 99, name: "Assistente", initial: "ML" });
+        try { window.ML_LAST_OTP_ERROR = { code: String(j2.error || ""), detail: String(j2.detail || "") }; } catch (_) {}
       }
     } catch (_) {}
   } catch (_) {}
@@ -2085,7 +2086,17 @@ function showConsentSuggestions() {
               setTimeout(() => { try { location.reload(); } catch (_) {} }, 15000);
             }, 60000);
         if (otpGate) otpGate.style.display = "grid";
-            if (otpError) { otpError.textContent = "Invio OTP via e-mail non riuscito. Riprova."; otpError.style.display = "block"; }
+            if (otpError) {
+              let extra = "";
+              try {
+                const e = window.ML_LAST_OTP_ERROR || {};
+                if (e.code || e.detail) {
+                  extra = " (" + [e.code, e.detail].filter(Boolean).join(": ").slice(0, 200) + ")";
+                }
+              } catch (_) {}
+              otpError.textContent = "Invio OTP via e-mail non riuscito. Riprova." + extra;
+              otpError.style.display = "block";
+            }
             if (userInput) userInput.disabled = true;
             try { otpInput && otpInput.focus(); } catch (_) {}
           }
@@ -2343,6 +2354,7 @@ if (speakBtn) {
 
 // Avvio
 window.addEventListener("DOMContentLoaded", () => {
+  showStartupPopup();
   updateHeaderAvatar(avatars[0]);
   showTyping(true);
   setTimeout(() => {
@@ -2363,13 +2375,6 @@ window.addEventListener("DOMContentLoaded", () => {
     forceEnableSend = false;
     updateSendDisabled();
     autoResize();
-  if (emailGate) emailGate.style.display = "block";
-  if (emailInput) {
-    emailInput.setAttribute("inputmode", "email");
-    emailInput.setAttribute("autocomplete", "email");
-    emailInput.focus();
-    try { emailInput.setSelectionRange((emailInput.value || "").length, (emailInput.value || "").length); } catch (_) {}
-  }
   }, 600);
   if (uploadCodiciBtn) {
     uploadCodiciBtn.addEventListener("click", () => {
@@ -2581,4 +2586,148 @@ async function verifyAppCode(code) {
     }
   } catch (_) {}
   return { found: false, used: false, error: true };
+}
+
+function showEmailGateNow() {
+  if (emailGate) emailGate.style.display = "block";
+  if (emailInput) {
+    emailInput.setAttribute("inputmode", "email");
+    emailInput.setAttribute("autocomplete", "email");
+    emailInput.focus();
+    try { emailInput.setSelectionRange((emailInput.value || "").length, (emailInput.value || "").length); } catch (_) {}
+  }
+}
+
+function showStartupPopup() {
+  const overlay = document.createElement("div");
+  overlay.style.position = "fixed";
+  overlay.style.left = "0";
+  overlay.style.top = "0";
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
+  overlay.style.background = "rgba(0,0,0,0.72)";
+  overlay.style.zIndex = "9999";
+  overlay.style.display = "flex";
+  overlay.style.alignItems = "center";
+  overlay.style.justifyContent = "center";
+  overlay.style.opacity = "0";
+  overlay.style.transition = "opacity 300ms ease";
+  try { overlay.style.backdropFilter = "blur(6px)"; } catch (_) {}
+
+  let styleEl = document.getElementById("mlPopupStyles");
+  if (!styleEl) {
+    styleEl = document.createElement("style");
+    styleEl.id = "mlPopupStyles";
+    styleEl.textContent = "@keyframes mlPulse{0%{box-shadow:0 0 12px rgba(255,255,255,0.08),0 0 28px rgba(0,153,255,0.18)}50%{box-shadow:0 0 24px rgba(255,255,255,0.18),0 0 64px rgba(255,0,150,0.28)}100%{box-shadow:0 0 12px rgba(255,255,255,0.08),0 0 28px rgba(0,153,255,0.18)}}@keyframes mlKenBurns{0%{transform:scale(1) translate3d(0,0,0)}100%{transform:scale(1.06) translate3d(1.5%, -1.5%, 0)}}";
+    document.head.appendChild(styleEl);
+  }
+  const box = document.createElement("div");
+  box.style.background = "transparent";
+  box.style.borderRadius = "12px";
+  box.style.padding = "16px";
+  box.style.display = "flex";
+  box.style.flexDirection = "column";
+  box.style.width = "auto";
+  box.style.height = "auto";
+  box.style.boxShadow = "none";
+  box.style.border = "2px solid #ffffff";
+  box.style.textAlign = "center";
+  box.style.perspective = "1000px";
+  box.style.animation = "mlPulse 3.5s ease-in-out infinite";
+  const wrap = document.createElement("div");
+  wrap.style.position = "relative";
+  wrap.style.width = "1px";
+  wrap.style.height = "1px";
+  wrap.style.overflow = "hidden";
+  let imgA = document.createElement("img");
+  imgA.style.position = "absolute";
+  imgA.style.left = "0";
+  imgA.style.top = "0";
+  imgA.style.width = "100%";
+  imgA.style.height = "100%";
+  imgA.style.objectFit = "contain";
+  imgA.style.opacity = "1";
+  imgA.style.transition = "opacity 1200ms ease-in-out, filter 1200ms ease-in-out";
+  imgA.style.filter = "blur(0px)";
+  let imgB = document.createElement("img");
+  imgB.style.position = "absolute";
+  imgB.style.left = "0";
+  imgB.style.top = "0";
+  imgB.style.width = "100%";
+  imgB.style.height = "100%";
+  imgB.style.objectFit = "contain";
+  imgB.style.opacity = "0";
+  imgB.style.transition = "opacity 1200ms ease-in-out, filter 1200ms ease-in-out";
+  imgB.style.filter = "blur(10px)";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.textContent = "Chiudi";
+  btn.style.marginTop = "12px";
+  btn.style.padding = "10px 20px";
+  btn.style.fontSize = "16px";
+  btn.style.borderRadius = "8px";
+  btn.style.border = "1px solid #ccc";
+  btn.style.background = "#f5f5f5";
+  btn.style.cursor = "pointer";
+  const imgs = ["step1.png","step2.png","step3.png","step4.png"];
+  let i = 0;
+  let timer = null;
+  const MORPH_MS = 1200;
+  const HOLD_MS = 5000;
+  const updateSizeFrom = (img) => {
+    try {
+      const nw = img.naturalWidth || img.width || 0;
+      const nh = img.naturalHeight || img.height || 0;
+      if (nw > 0 && nh > 0) {
+        const sw = Math.round(nw * 0.5);
+        const sh = Math.round(nh * 0.5);
+        wrap.style.width = sw + "px";
+        wrap.style.height = sh + "px";
+        imgA.style.width = "100%";
+        imgA.style.height = "100%";
+        imgB.style.width = "100%";
+        imgB.style.height = "100%";
+      }
+    } catch (_) {}
+  };
+  const loadImage = (img, src, cb) => {
+    try {
+      img.onload = () => { img.onload = null; cb(); };
+      img.onerror = () => { try { img.onerror = null; } catch (_) {} cb(); };
+    } catch (_) { img.onload = null; }
+    img.src = src;
+    if (img.complete) {
+      try {
+        if (img.naturalWidth > 0 || img.naturalHeight > 0) {
+          setTimeout(cb, 0);
+        }
+      } catch (_) { setTimeout(cb, 0); }
+    }
+  };
+  const startSequence = () => {
+    loadImage(imgA, imgs[i], () => { updateSizeFrom(imgA); });
+    i = (i + 1) % imgs.length;
+    loadImage(imgB, imgs[i], () => {});
+  };
+  
+  const advance = () => {
+    loadImage(imgA, imgs[i], () => {
+      updateSizeFrom(imgA);
+      i = (i + 1) % imgs.length;
+    });
+  };
+  startSequence();
+  wrap.appendChild(imgA);
+  wrap.appendChild(imgB);
+  btn.addEventListener("click", () => {
+    try { clearTimeout(timer); } catch (_) {}
+    overlay.style.opacity = "0";
+    setTimeout(() => { try { overlay.remove(); } catch (_) {} try { showEmailGateNow(); } catch (_) {} }, 300);
+  });
+  box.appendChild(wrap);
+  box.appendChild(btn);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  const scheduleNext = () => { timer = setTimeout(() => { advance(); scheduleNext(); }, HOLD_MS); };
+  setTimeout(() => { overlay.style.opacity = "1"; scheduleNext(); }, 120);
 }
