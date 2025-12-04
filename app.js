@@ -2669,7 +2669,7 @@ function showStartupPopup() {
   btn.style.border = "1px solid #ccc";
   btn.style.background = "#f5f5f5";
   btn.style.cursor = "pointer";
-  const imgs = ["step1.png","step2.png","step3.png","step4.png"];
+  const imgs = ["step1.jpg","step2.jpg","step3.jpg","step4.jpg"];
   let i = 0;
   let timer = null;
   const MORPH_MS = 1200;
