@@ -2669,7 +2669,7 @@ function showStartupPopup() {
   btn.style.border = "1px solid #ccc";
   btn.style.background = "#f5f5f5";
   btn.style.cursor = "pointer";
-  const imgs = ["step1","step2","step3","step4"];
+  const imgs = ["step1.jpg","step2.jpg","step3.jpg","step4.jpg"];
   let i = 0;
   let timer = null;
   const MORPH_MS = 1200;
@@ -2679,8 +2679,8 @@ function showStartupPopup() {
       const nw = img.naturalWidth || img.width || 0;
       const nh = img.naturalHeight || img.height || 0;
       if (nw > 0 && nh > 0) {
-        const sw = Math.round(nw * 0.5);
-        const sh = Math.round(nh * 0.5);
+        const sw = Math.round(nw * 1);
+        const sh = Math.round(nh * 1);
         wrap.style.width = sw + "px";
         wrap.style.height = sh + "px";
         imgA.style.width = "100%";
@@ -2704,37 +2704,14 @@ function showStartupPopup() {
       } catch (_) { setTimeout(cb, 0); }
     }
   };
-  const loadImageSmart = (img, base, cb) => {
-    const b = String(base || "");
-    const bases = [b, b.toLowerCase(), b.toUpperCase(), b.charAt(0).toUpperCase() + b.slice(1)];
-    const exts = ["jpg","jpeg","png","webp"];
-    let bi = 0, ei = 0;
-    const tryNext = () => {
-      if (bi >= bases.length) { cb(); return; }
-      const candidate = bases[bi] + "." + exts[ei];
-      try {
-        img.onload = () => { img.onload = null; img.onerror = null; cb(); };
-        img.onerror = () => { img.onload = null; img.onerror = null; ei++; if (ei >= exts.length) { ei = 0; bi++; } tryNext(); };
-      } catch (_) {}
-      img.src = candidate;
-      if (img.complete) {
-        try {
-          if (img.naturalWidth > 0 || img.naturalHeight > 0) {
-            setTimeout(() => { if (typeof img.onload === "function") img.onload(); }, 0);
-          }
-        } catch (_) { setTimeout(() => { if (typeof img.onload === "function") img.onload(); }, 0); }
-      }
-    };
-    tryNext();
-  };
   const startSequence = () => {
-    loadImageSmart(imgA, imgs[i], () => { updateSizeFrom(imgA); });
+    loadImage(imgA, imgs[i], () => { updateSizeFrom(imgA); });
     i = (i + 1) % imgs.length;
-    loadImageSmart(imgB, imgs[i], () => {});
+    loadImage(imgB, imgs[i], () => {});
   };
   
   const advance = () => {
-    loadImageSmart(imgA, imgs[i], () => {
+    loadImage(imgA, imgs[i], () => {
       updateSizeFrom(imgA);
       i = (i + 1) % imgs.length;
     });
